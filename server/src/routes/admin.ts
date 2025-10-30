@@ -64,7 +64,7 @@ const competitionSchema = z.object({
   status: z.string().optional(),
 })
 
-router.get("/competitions", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/competitions", async (_req, res) => {
   const list = await prisma.competition.findMany({ orderBy: { createdAt: "desc" } })
   res.json(list)
 })
@@ -78,7 +78,7 @@ const byteSizeSchema = z.object({
   tags: z.array(z.string()).optional(),
 })
 
-router.get("/bytesize", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/bytesize", async (_req, res) => {
   const list = await (prisma as any).byteSizeItem.findMany({
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { likes: true } } },
@@ -86,7 +86,7 @@ router.get("/bytesize", async (_req: AuthenticatedRequest, res: Response) => {
   res.json(list)
 })
 
-router.post("/bytesize", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/bytesize", async (req, res) => {
   const parsed = byteSizeSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -103,7 +103,7 @@ router.post("/bytesize", async (req: AuthenticatedRequest, res: Response) => {
   res.status(201).json(created)
 })
 
-router.delete("/bytesize/:id", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/bytesize/:id", async (req, res) => {
   const { id } = req.params
   try {
     // try to remove likes first (FK safety)
@@ -127,7 +127,7 @@ router.delete("/bytesize/:id", async (req: AuthenticatedRequest, res: Response) 
 })
 
 // Revoke (delete) a specific user achievement (admin-only)
-router.delete("/user-achievements/:id", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/user-achievements/:id", async (req, res) => {
   const { id } = req.params
   try {
     await prisma.userAchievement.delete({ where: { id } })
@@ -137,7 +137,7 @@ router.delete("/user-achievements/:id", async (req: AuthenticatedRequest, res: R
   }
 })
 
-router.post("/competitions", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/competitions", async (req, res) => {
   const parsed = competitionSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -156,7 +156,7 @@ router.post("/competitions", async (req: AuthenticatedRequest, res: Response) =>
   res.status(201).json(created)
 })
 
-router.put("/competitions/:competitionId", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/competitions/:competitionId", async (req, res) => {
   const { competitionId } = req.params
   const parsed = competitionSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -180,7 +180,7 @@ router.put("/competitions/:competitionId", async (req: AuthenticatedRequest, res
   }
 })
 
-router.delete("/competitions/:competitionId", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/competitions/:competitionId", async (req, res) => {
   const { competitionId } = req.params
   await prisma.competition.delete({ where: { id: competitionId } }).catch(() => null)
   res.json({ success: true })
@@ -244,7 +244,7 @@ const teamSchema = z.object({
 
 
 // Platform statistics for Admin Dashboard
-router.get("/stats", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/stats", async (_req, res) => {
   const [totalUsers, totalCourses, pendingPayments, approvedPayments, revenueAgg] = await Promise.all([
     prisma.user.count(),
     prisma.course.count(),
@@ -265,7 +265,7 @@ router.get("/stats", async (_req: AuthenticatedRequest, res: Response) => {
 })
 
 // Payments management
-router.get("/purchases", async (req: AuthenticatedRequest, res: Response) => {
+router.get("/purchases", async (req, res) => {
   const status = (req.query.status as string | undefined) as any
   const limit = Number(req.query.limit || 50)
   const purchases = await prisma.purchase.findMany({
@@ -294,7 +294,7 @@ router.get("/purchases", async (req: AuthenticatedRequest, res: Response) => {
   )
 })
 
-router.post("/purchases/:id/approve", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/purchases/:id/approve", async (req, res) => {
   const { id } = req.params
   const updated = await prisma.purchase.update({
     where: { id },
@@ -304,7 +304,7 @@ router.post("/purchases/:id/approve", async (req: AuthenticatedRequest, res: Res
   res.json(updated)
 })
 
-router.post("/purchases/:id/reject", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/purchases/:id/reject", async (req, res) => {
   const { id } = req.params
   const updated = await prisma.purchase.update({
     where: { id },
@@ -317,7 +317,7 @@ router.post("/purchases/:id/reject", async (req: AuthenticatedRequest, res: Resp
 // User management (admin-only)
 const roleUpdateSchema = z.object({ role: z.enum(["ADMIN", "USER"]) })
 
-router.get("/users", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/users", async (_req, res) => {
   const users = await (prisma as any).user.findMany({
     orderBy: { createdAt: "desc" },
     select: { id: true, email: true, role: true, fullName: true, createdAt: true, experiencePoints: true, banned: true, bannedReason: true } as any,
@@ -328,7 +328,7 @@ router.get("/users", async (_req: AuthenticatedRequest, res: Response) => {
 const banSchema = z.object({ reason: z.string().optional() })
 
 // Ban user
-router.post("/users/:userId/ban", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/ban", async (req, res) => {
   const { userId } = req.params
   const parsed = banSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -341,7 +341,7 @@ router.post("/users/:userId/ban", async (req: AuthenticatedRequest, res: Respons
 })
 
 // Unban user
-router.post("/users/:userId/unban", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/unban", async (req, res) => {
   const { userId } = req.params
   try {
     const updated = await (prisma as any).user.update({ where: { id: userId }, data: { banned: false, bannedReason: null } as any })
@@ -351,7 +351,7 @@ router.post("/users/:userId/unban", async (req: AuthenticatedRequest, res: Respo
   }
 })
 
-router.post("/users/:userId/role", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/role", async (req, res) => {
   const { userId } = req.params
   const parsed = roleUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -363,7 +363,7 @@ router.post("/users/:userId/role", async (req: AuthenticatedRequest, res: Respon
   }
 })
 
-router.post("/users/:userId/promote", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/promote", async (req, res) => {
   const { userId } = req.params
   try {
     const updated = await prisma.user.update({ where: { id: userId }, data: { role: "ADMIN" } })
@@ -373,7 +373,7 @@ router.post("/users/:userId/promote", async (req: AuthenticatedRequest, res: Res
   }
 })
 
-router.post("/users/:userId/demote", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/demote", async (req, res) => {
   const { userId } = req.params
   try {
     const updated = await prisma.user.update({ where: { id: userId }, data: { role: "USER" } })
@@ -384,7 +384,7 @@ router.post("/users/:userId/demote", async (req: AuthenticatedRequest, res: Resp
 })
 
 // Overview for a specific user: participations, purchases, achievements
-router.get("/users/:userId/overview", async (req: AuthenticatedRequest, res: Response) => {
+router.get("/users/:userId/overview", async (req, res) => {
   const { userId } = req.params
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -405,7 +405,7 @@ router.get("/users/:userId/overview", async (req: AuthenticatedRequest, res: Res
 })
 
 // Achievements across all users
-router.get("/achievements/users", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/achievements/users", async (_req, res) => {
   const list = await prisma.userAchievement.findMany({
     orderBy: { earnedAt: "desc" },
     include: {
@@ -419,7 +419,7 @@ router.get("/achievements/users", async (_req: AuthenticatedRequest, res: Respon
 // Award a simple ad-hoc achievement to a user (admin-only)
 const awardSchema = z.object({ text: z.string().min(1) })
 
-router.post("/users/:userId/achievements", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/achievements", async (req, res) => {
   const { userId } = req.params
   const parsed = awardSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -448,7 +448,7 @@ router.post("/users/:userId/achievements", async (req: AuthenticatedRequest, res
 // Enroll user to a course (admin-only)
 const enrollSchema = z.object({ courseId: z.string().min(1) })
 
-router.post("/users/:userId/enrollments", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/users/:userId/enrollments", async (req, res) => {
   const { userId } = req.params
   const parsed = enrollSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -473,7 +473,7 @@ router.post("/users/:userId/enrollments", async (req: AuthenticatedRequest, res:
   }
 })
 
-router.get("/courses", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/courses", async (_req, res) => {
   const courses = await prisma.course.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -486,7 +486,7 @@ router.get("/courses", async (_req: AuthenticatedRequest, res: Response) => {
   res.json(courses)
 })
 
-router.post("/courses", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courses", async (req, res) => {
   const parsed = courseSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -536,7 +536,7 @@ router.post("/courses", async (req: AuthenticatedRequest, res: Response) => {
   res.status(201).json(course)
 })
 
-router.put("/courses/:courseId", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/courses/:courseId", async (req, res) => {
   const { courseId } = req.params
   const parsed = courseSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -758,14 +758,14 @@ router.put("/courses/:courseId", async (req: AuthenticatedRequest, res: Response
   res.json(updated)
 })
 
-router.post("/courses/:courseId/publish", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/courses/:courseId/publish", async (req, res) => {
   const { courseId } = req.params
   const { published } = z.object({ published: z.boolean().default(true) }).parse(req.body)
   const course = await prisma.course.update({ where: { id: courseId }, data: { isPublished: published } })
   res.json(course)
 })
 
-router.delete("/courses/:courseId", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/courses/:courseId", async (req, res) => {
   const { courseId } = req.params
   try {
     await prisma.$transaction([
@@ -779,12 +779,12 @@ router.delete("/courses/:courseId", async (req: AuthenticatedRequest, res: Respo
   res.json({ success: true })
 })
 
-router.get("/teams", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/teams", async (_req, res) => {
   const teams = await prisma.team.findMany({ orderBy: { createdAt: "desc" }, include: { _count: { select: { memberships: true } } } })
   res.json(teams)
 })
 
-router.post("/teams", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/teams", async (req, res) => {
   const parsed = teamSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -805,7 +805,7 @@ router.post("/teams", async (req: AuthenticatedRequest, res: Response) => {
   res.status(201).json(team)
 })
 
-router.put("/teams/:teamId", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/teams/:teamId", async (req, res) => {
   const { teamId } = req.params
   const parsed = teamSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -827,7 +827,7 @@ router.put("/teams/:teamId", async (req: AuthenticatedRequest, res: Response) =>
   res.json(team)
 })
 
-router.delete("/teams/:teamId", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/teams/:teamId", async (req, res) => {
   const { teamId } = req.params
   await prisma.teamMembership.deleteMany({ where: { teamId } }).catch(() => null)
   await prisma.team.delete({ where: { id: teamId } }).catch(() => null)
@@ -835,7 +835,7 @@ router.delete("/teams/:teamId", async (req: AuthenticatedRequest, res: Response)
 })
 
 // Team members with registration statuses
-router.get("/teams/:teamId/members", async (req: AuthenticatedRequest, res: Response) => {
+router.get("/teams/:teamId/members", async (req, res) => {
   const { teamId } = req.params
   const status = (req.query.status as string | undefined) || undefined
   const where: any = { teamId }
@@ -854,7 +854,7 @@ const memberUpdateSchema = z.object({
   status: z.string().optional(),
 })
 
-router.put("/teams/:teamId/members/:membershipId", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/teams/:teamId/members/:membershipId", async (req, res) => {
   const { membershipId } = req.params
   const parsed = memberUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -865,13 +865,13 @@ router.put("/teams/:teamId/members/:membershipId", async (req: AuthenticatedRequ
 })
 
 // ---- Events moderation ----
-router.get("/events", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/events", async (_req, res) => {
   const events = await (prisma as any).event.findMany({ orderBy: { createdAt: "desc" } })
   res.json(events)
 })
 
 // List registrations for a specific event
-router.get("/events/:eventId/registrations", async (req: AuthenticatedRequest, res: Response) => {
+router.get("/events/:eventId/registrations", async (req, res) => {
   const { eventId } = req.params
   const regs = await (prisma as any).eventRegistration.findMany({
     where: { eventId },
@@ -882,21 +882,21 @@ router.get("/events/:eventId/registrations", async (req: AuthenticatedRequest, r
 })
 
 // Approve or reject a registration
-router.post("/events/:eventId/registrations/:regId/approve", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/events/:eventId/registrations/:regId/approve", async (req, res) => {
   const { regId } = req.params
   const updated = await (prisma as any).eventRegistration.update({ where: { id: regId }, data: { status: "approved" } }).catch(() => null)
   if (!updated) return res.status(404).json({ error: "Registration not found" })
   res.json(updated)
 })
 
-router.post("/events/:eventId/registrations/:regId/reject", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/events/:eventId/registrations/:regId/reject", async (req, res) => {
   const { regId } = req.params
   const updated = await (prisma as any).eventRegistration.update({ where: { id: regId }, data: { status: "rejected" } }).catch(() => null)
   if (!updated) return res.status(404).json({ error: "Registration not found" })
   res.json(updated)
 })
 
-router.put("/events/:eventId", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/events/:eventId", async (req, res) => {
   const { eventId } = req.params
   const data = req.body as any
   try {
@@ -923,7 +923,7 @@ router.put("/events/:eventId", async (req: AuthenticatedRequest, res: Response) 
 })
 
 // Create event as admin
-router.post("/events", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/events", async (req, res) => {
   const data = req.body as any
   const created = await (prisma as any).event.create({
     data: {
@@ -945,14 +945,14 @@ router.post("/events", async (req: AuthenticatedRequest, res: Response) => {
   res.status(201).json(created)
 })
 
-router.post("/events/:eventId/publish", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/events/:eventId/publish", async (req, res) => {
   const { eventId } = req.params
   const ev = await (prisma as any).event.update({ where: { id: eventId }, data: { status: "published" } }).catch(() => null)
   if (!ev) return res.status(404).json({ error: "Event not found" })
   res.json(ev)
 })
 
-router.post("/events/:eventId/reject", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/events/:eventId/reject", async (req, res) => {
   const { eventId } = req.params
   const ev = await (prisma as any).event.update({ where: { id: eventId }, data: { status: "rejected" } }).catch(() => null)
   if (!ev) return res.status(404).json({ error: "Event not found" })
@@ -960,7 +960,7 @@ router.post("/events/:eventId/reject", async (req: AuthenticatedRequest, res: Re
 })
 
 // Delete event (admin)
-router.delete("/events/:eventId", async (req: AuthenticatedRequest, res: Response) => {
+router.delete("/events/:eventId", async (req, res) => {
   const { eventId } = req.params
   await (prisma as any).eventRegistration.deleteMany({ where: { eventId } }).catch(() => null)
   await (prisma as any).event.delete({ where: { id: eventId } }).catch(() => null)
@@ -968,13 +968,13 @@ router.delete("/events/:eventId", async (req: AuthenticatedRequest, res: Respons
 })
 
 // Bulk delete all events (admin)
-router.delete("/events", async (_req: AuthenticatedRequest, res: Response) => {
+router.delete("/events", async (_req, res) => {
   const result = await (prisma as any).event.deleteMany({})
   res.json({ success: true, deleted: result.count ?? undefined })
 })
 
 // ---- Competition submissions moderation ----
-router.get("/competition-submissions", async (req: AuthenticatedRequest, res: Response) => {
+router.get("/competition-submissions", async (req, res) => {
   const status = (req.query.status as string | undefined) as any
   const where = status ? { status } : {}
   const list = await prisma.competitionSubmission.findMany({
@@ -985,7 +985,7 @@ router.get("/competition-submissions", async (req: AuthenticatedRequest, res: Re
   res.json(list)
 })
 
-router.put("/competition-submissions/:id", async (req: AuthenticatedRequest, res: Response) => {
+router.put("/competition-submissions/:id", async (req, res) => {
   const { id } = req.params
   const data = req.body as any
   try {
@@ -1007,14 +1007,14 @@ router.put("/competition-submissions/:id", async (req: AuthenticatedRequest, res
   }
 })
 
-router.post("/competition-submissions/:id/approve", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/competition-submissions/:id/approve", async (req, res) => {
   const { id } = req.params
   const sub = await prisma.competitionSubmission.update({ where: { id }, data: { status: "approved" } }).catch(() => null)
   if (!sub) return res.status(404).json({ error: "Submission not found" })
   res.json(sub)
 })
 
-router.post("/competition-submissions/:id/reject", async (req: AuthenticatedRequest, res: Response) => {
+router.post("/competition-submissions/:id/reject", async (req, res) => {
   const { id } = req.params
   const sub = await prisma.competitionSubmission.update({ where: { id }, data: { status: "rejected" } }).catch(() => null)
   if (!sub) return res.status(404).json({ error: "Submission not found" })

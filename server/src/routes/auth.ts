@@ -63,7 +63,7 @@ setInterval(() => {
 const DEV_AUTH = process.env.DEV_AUTH === "1"
 
 if (DEV_AUTH) {
-  router.post("/login", async (req: Request, res: Response) => {
+  router.post("/login", async (req, res) => {
     const { email, password } = (req.body || {}) as { email?: string; password?: string }
     if (email === "1" && password === "1") {
       const accessToken = signAccessToken("dev-admin", "ADMIN")
@@ -83,7 +83,7 @@ if (DEV_AUTH) {
     return res.status(401).json({ error: "Invalid credentials" })
   })
 
-  router.post("/refresh", async (req: Request, res: Response) => {
+  router.post("/refresh", async (req, res) => {
     const { refreshToken } = (req.body || {}) as { refreshToken?: string }
     if (!refreshToken) return res.status(400).json({ error: "Missing refresh token" })
     try {
@@ -96,11 +96,11 @@ if (DEV_AUTH) {
     }
   })
 
-  router.post("/logout", async (_req: Request, res: Response) => {
+  router.post("/logout", async (_req, res) => {
     return res.json({ success: true })
   })
 
-  router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  router.get("/me", requireAuth, async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" })
     return res.json({
       id: "dev-admin",
@@ -113,7 +113,7 @@ if (DEV_AUTH) {
   })
 }
 
-router.post("/register", async (req: Request, res: Response) => {
+router.post("/register", async (req, res) => {
   const parsed = registerSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, password, fullName, age, educationalInstitution, primaryRole } = parsed.data
@@ -178,7 +178,7 @@ router.post("/register", async (req: Request, res: Response) => {
   })
 })
 
-router.post("/send-verification", async (req: Request, res: Response) => {
+router.post("/send-verification", async (req, res) => {
   const { email } = req.body as { email?: string }
   
   if (!email) {
@@ -223,7 +223,7 @@ router.post("/send-verification", async (req: Request, res: Response) => {
   }
 })
 
-router.post("/verify-email", async (req: Request, res: Response) => {
+router.post("/verify-email", async (req, res) => {
   const parsed = verifyEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code } = parsed.data
@@ -272,7 +272,7 @@ router.post("/verify-email", async (req: Request, res: Response) => {
   }
 })
 
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, password } = parsed.data
@@ -333,7 +333,7 @@ router.post("/login", async (req: Request, res: Response) => {
   })
 })
 
-router.post("/login-verify", async (req: Request, res: Response) => {
+router.post("/login-verify", async (req, res) => {
   const parsed = verifyEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code } = parsed.data
@@ -430,7 +430,7 @@ router.post("/login-verify", async (req: Request, res: Response) => {
 })
 
 // Password reset request with rate limiting
-router.post("/forgot-password", async (req: Request, res: Response) => {
+router.post("/forgot-password", async (req, res) => {
   const parsed = passwordResetRequestSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email } = parsed.data
@@ -474,7 +474,7 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
   }
 })
 
-router.post("/verify-reset-code", async (req: Request, res: Response) => {
+router.post("/verify-reset-code", async (req, res) => {
   const parsed = verifyEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code } = parsed.data
@@ -512,7 +512,7 @@ router.post("/verify-reset-code", async (req: Request, res: Response) => {
   }
 })
 
-router.post("/reset-password", async (req, res) {
+router.post("/reset-password", async (req, res) => {
   const parsed = passwordResetSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code, newPassword } = parsed.data
@@ -563,7 +563,7 @@ router.post("/reset-password", async (req, res) {
 })
 
 // Change password (authenticated users)
-router.post("/change-password", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/change-password", requireAuth, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   
   const parsed = changePasswordSchema.safeParse(req.body)
@@ -599,7 +599,7 @@ router.post("/change-password", requireAuth, async (req: AuthenticatedRequest, r
   }
 })
 
-router.post("/refresh", async (req: Request, res: Response) => {
+router.post("/refresh", async (req, res) => {
   const parsed = refreshSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { refreshToken } = parsed.data
@@ -628,7 +628,7 @@ router.post("/refresh", async (req: Request, res: Response) => {
   res.json({ accessToken, refreshToken: newRefreshToken })
 })
 
-router.post("/logout", async (req: Request, res: Response) => {
+router.post("/logout", async (req, res) => {
   const parsed = refreshSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { refreshToken } = parsed.data
@@ -636,7 +636,7 @@ router.post("/logout", async (req: Request, res: Response) => {
   res.json({ success: true })
 })
 
-router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/me", requireAuth, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
@@ -667,7 +667,7 @@ const profileUpdateSchema = z.object({
   primaryRole: z.string().optional(),
 })
 
-router.put("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.put("/me", requireAuth, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   const parsed = profileUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })

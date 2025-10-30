@@ -16,12 +16,12 @@ const competitionSubmissionSchema = z.object({
   imageUrl: z.string().optional(),
 })
 
-router.get("/competitions/mine", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.get("/competitions/mine", requireAuth, async (req, res) => {
   const list = await prisma.competitionSubmission.findMany({ where: { userId: req.user!.id }, orderBy: { createdAt: "desc" } })
   res.json(list)
 })
 
-router.post("/competitions", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+router.post("/competitions", requireAuth, async (req, res) => {
   const parsed = competitionSubmissionSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
