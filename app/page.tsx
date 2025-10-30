@@ -12,7 +12,7 @@ import { RegisterVerification } from "@/components/auth/register-verification"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, register, updateProfile } = useAuth()
+  const { login, register, updateProfile, refreshUser } = useAuth()
   const { user, loading } = useAuth() as any
   const [isLogin, setIsLogin] = useState(true)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
@@ -39,29 +39,16 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password })
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Ошибка входа")
-      }
-      
-      if (data.requiresEmailVerification) {
-        setRequiresEmailVerification(true)
-        setVerificationEmail(data.email)
-      } else {
-        // Direct login (for dev mode)
-        await login(email.trim(), password)
-        toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
-        router.push("/dashboard")
-      }
+      await login(email.trim(), password)
+      toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
+      router.push("/dashboard")
     } catch (e: any) {
-      toast({ title: "Ошибка входа", description: e?.message || "Проверьте почту и пароль", variant: "destructive" as any })
+      if (e?.message && e.message.includes("Email не подтверждён")) {
+        setRequiresEmailVerification(true)
+        setVerificationEmail(email.trim())
+      } else {
+        toast({ title: "Ошибка входа", description: e?.message || "Проверьте почту и пароль", variant: "destructive" as any })
+      }
     }
   }
 
@@ -112,23 +99,19 @@ export default function LoginPage() {
   }
 
   const handleLoginVerificationSuccess = async (data: any) => {
-    // Set tokens and user data
     localStorage.setItem("accessToken", data.accessToken)
     localStorage.setItem("refreshToken", data.refreshToken)
-    
-    // Redirect to dashboard
+    await refreshUser()
+    toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
     router.push("/dashboard")
-    router.refresh()
   }
 
   const handleRegisterVerificationSuccess = async (data: any) => {
-    // Set tokens and user data
     localStorage.setItem("accessToken", data.accessToken)
     localStorage.setItem("refreshToken", data.refreshToken)
-    
-    // Redirect to dashboard
+    await refreshUser()
+    toast({ title: "Регистрация успешна", description: "Добро пожаловать!" })
     router.push("/dashboard")
-    router.refresh()
   }
 
   const handleBackToLogin = () => {
@@ -163,12 +146,25 @@ export default function LoginPage() {
     }
   }
 
-  const handleVerifyResetCode = () => {
+  const handleVerifyResetCode = async () => {
     if (resetCode.length !== 6) {
       toast({ title: "Неверный код", description: "Код должен содержать 6 символов", variant: "destructive" as any })
       return
     }
-    setForgotPasswordStep("reset")
+    try {
+      const response = await fetch("/api/auth/verify-reset-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, code: resetCode })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Неверный код")
+      }
+      setForgotPasswordStep("reset")
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Неверный код сброса пароля", variant: "destructive" as any })
+    }
   }
 
   const handleResetPassword = async () => {
@@ -218,18 +214,18 @@ export default function LoginPage() {
         </div>
 
         <SocialPanel />
-        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
+        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
           <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
           <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
         </div>
-        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
+        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
           <div className="text-white font-medium">Обновление</div>
           <div className="text-white text-2xl font-bold">1.0</div>
           <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
         </div>
         <div
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-          style={{ animationDelay: "1800ms" }}
+          style={{ animationDelay: "400ms" }}
         >
           <div className="text-[#636370] text-xs text-center">
             <div>Version 0.1</div>
@@ -259,18 +255,18 @@ export default function LoginPage() {
         </div>
 
         <SocialPanel />
-        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
+        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
           <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
           <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
         </div>
-        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
+        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
           <div className="text-white font-medium">Обновление</div>
           <div className="text-white text-2xl font-bold">1.0</div>
           <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
         </div>
         <div
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-          style={{ animationDelay: "1800ms" }}
+          style={{ animationDelay: "400ms" }}
         >
           <div className="text-[#636370] text-xs text-center">
             <div>Version 0.1</div>
@@ -461,18 +457,18 @@ export default function LoginPage() {
       </div>
 
       <SocialPanel />
-      <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
+      <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
         <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
         <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
       </div>
-      <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
+      <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
         <div className="text-white font-medium">Обновление</div>
         <div className="text-white text-2xl font-bold">1.0</div>
         <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
       </div>
       <div
         className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-        style={{ animationDelay: "1800ms" }}
+        style={{ animationDelay: "400ms" }}
       >
         <div className="text-[#636370] text-xs text-center">
           <div>Version 0.1</div>

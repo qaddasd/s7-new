@@ -428,38 +428,43 @@ export default function Page() {
 
     try {
       let created: any = null
-      try {
-        const payload = {
-          title: title.trim(),
-          description: title.trim(),
-          difficulty,
-          price: free ? 0 : Number(price || 0),
-          isFree: free,
-          isPublished: true,
-          modules: finalModules.map((m, mi) => ({
-            ...( (typeof (m as any).remoteId === 'string' && (m as any).remoteId) ? { id: (m as any).remoteId as string } : {} ),
-            title: (m as any).title || `Модуль ${mi + 1}`,
-            orderIndex: mi,
-            lessons: (m as any).lessons?.map((l: any, li: number) => ({
-              ...( (typeof (l as any).remoteId === 'string' && (l as any).remoteId) ? { id: (l as any).remoteId as string } : {} ),
-              title: l.title || `Урок ${li + 1}`,
-              duration: l.time || l.duration || undefined,
-              orderIndex: li,
-              isFreePreview: false,
-              content: l.content || undefined,
-              contentType: "text",
-              videoUrl: l.videoUrl || undefined,
-              presentationUrl: l.presentationUrl || undefined,
-              slides: Array.isArray(l.slideUrls) && l.slideUrls.length
-                ? l.slideUrls.map((u: string) => ({ url: u }))
-                : undefined,
-            })) || [],
-          })),
-        }
-        created = await apiFetch<any>(
-          editId ? `/api/admin/courses/${encodeURIComponent(editId)}?sync=ids` : "/api/admin/courses",
-          { method: editId ? "PUT" : "POST", body: JSON.stringify(payload) }
-        )
+
+      const payload = {
+        title: title.trim(),
+        description: title.trim(),
+        difficulty,
+        price: free ? 0 : Number(price || 0),
+        isFree: free,
+        isPublished: true,
+        modules: finalModules.map((m, mi) => ({
+          ...( (typeof (m as any).remoteId === 'string' && (m as any).remoteId) ? { id: (m as any).remoteId as string } : {} ),
+          title: (m as any).title || `Модуль ${mi + 1}`,
+          orderIndex: mi,
+          lessons: (m as any).lessons?.map((l: any, li: number) => ({
+            ...( (typeof (l as any).remoteId === 'string' && (l as any).remoteId) ? { id: (l as any).remoteId as string } : {} ),
+            title: l.title || `Урок ${li + 1}`,
+            duration: l.time || l.duration || undefined,
+            orderIndex: li,
+            isFreePreview: false,
+            content: l.content || undefined,
+            contentType: "text",
+            videoUrl: l.videoUrl || undefined,
+            presentationUrl: l.presentationUrl || undefined,
+            slides: Array.isArray(l.slideUrls) && l.slideUrls.length
+              ? l.slideUrls.map((u: string) => ({ url: u }))
+              : undefined,
+          })) || [],
+        })),
+      }
+
+      created = await apiFetch<any>(
+        editId ? `/api/admin/courses/${encodeURIComponent(editId)}?sync=ids` : "/api/admin/courses",
+        { method: editId ? "PUT" : "POST", body: JSON.stringify(payload) }
+      )
+
+      if (!created || !created.id) {
+        throw new Error("Сервер не вернул ID курса")
+      }
         try {
           // Update the draft with the new remote IDs from the backend
           const draftRaw = draftKey ? localStorage.getItem(draftKey) : localStorage.getItem("s7_admin_course_draft")
@@ -529,24 +534,19 @@ export default function Page() {
         } catch (e) {
           console.error("Failed to update draft with remote IDs:", e)
         }
-      } catch (e: any) {
-        console.warn("Backend create course failed:", e?.message)
-        throw e
-      }
 
       const raw = localStorage.getItem("s7_admin_courses")
       const list = raw ? JSON.parse(raw) : []
-      const courseForCards = created?.id
-        ? {
-            id: created.id,
-            title: created.title,
-            difficulty: created.difficulty,
-            author,
-            price: free ? 0 : price,
-            modules: (created.modules || []).map((m: any) => ({ id: m.id, title: m.title, lessons: (m.lessons || []).map((l: any) => ({ id: l.id, title: l.title })) })),
-            published: true,
-          }
-        : newCourse
+      const courseForCards = {
+        id: created.id,
+        title: created.title,
+        difficulty: created.difficulty,
+        author,
+        price: free ? 0 : price,
+        modules: (created.modules || []).map((m: any) => ({ id: m.id, title: m.title, lessons: (m.lessons || []).map((l: any) => ({ id: l.id, title: l.title })) })),
+        published: true,
+      }
+
       if (editId) {
         const idx = list.findIndex((c: any) => c.id === editId)
         if (idx !== -1) list[idx] = courseForCards
@@ -563,7 +563,9 @@ export default function Page() {
         if (Array.isArray(fresh)) {
           localStorage.setItem("s7_admin_courses", JSON.stringify(fresh))
         }
-      } catch {}
+      } catch (e: any) {
+        console.warn("Failed to refresh courses list:", e)
+      }
 
       try {
         const db = listCourses()
@@ -571,16 +573,25 @@ export default function Page() {
         if (i >= 0) db[i] = courseForCards as any
         else db.push(courseForCards as any)
         saveCourses(db as any)
-      } catch {}
+      } catch (e: any) {
+        console.warn("Failed to save to local DB:", e)
+      }
 
       if (!editId) {
         localStorage.removeItem(draftKey)
         localStorage.removeItem("s7_admin_course_default_id")
       }
-    } catch {}
 
-    toast({ title: "Курс сохранён" } as any)
-    router.push("/admin/courses")
+      toast({ title: "Курс сохранён", description: `Курс "${created.title}" успешно ${editId ? 'обновлен' : 'создан'}` } as any)
+      router.push("/admin/courses")
+    } catch (e: any) {
+      console.error("Failed to publish course:", e)
+      toast({
+        title: "Ошибка публикации курса",
+        description: e?.message || "Не удалось опубликовать курс. Попробуйте еще раз.",
+        variant: "destructive" as any
+      })
+    }
   }
 
   return (

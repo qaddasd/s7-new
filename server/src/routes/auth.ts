@@ -326,6 +326,9 @@ router.post("/login", async (req: Request, res: Response) => {
       role: user.role,
       fullName: user.fullName,
       xp: Number((user as any).experiencePoints || 0),
+      age: (user as any).age,
+      educationalInstitution: (user as any).educationalInstitution,
+      primaryRole: (user as any).primaryRole,
     },
   })
 })
@@ -471,8 +474,45 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
   }
 })
 
-// Password reset with attempt limiting
-router.post("/reset-password", async (req: Request, res: Response) => {
+router.post("/verify-reset-code", async (req: Request, res: Response) => {
+  const parsed = verifyEmailSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { email, code } = parsed.data
+
+  try {
+    const stored = verificationCodes.get(email)
+    if (!stored || stored.type !== 'password-reset') {
+      return res.status(400).json({ error: "Reset code not found or expired" })
+    }
+
+    if (stored.expiresAt < new Date()) {
+      verificationCodes.delete(email)
+      return res.status(400).json({ error: "Reset code expired" })
+    }
+
+    if (stored.attempts >= 3) {
+      verificationCodes.delete(email)
+      return res.status(400).json({ error: "Too many failed attempts. Please request a new code." })
+    }
+
+    stored.attempts += 1
+    verificationCodes.set(email, stored)
+
+    if (stored.code !== code) {
+      return res.status(400).json({ error: "Invalid reset code" })
+    }
+
+    stored.attempts = 0
+    verificationCodes.set(email, stored)
+
+    res.json({ success: true, attemptsRemaining: 3 - stored.attempts })
+  } catch (error) {
+    console.error("Failed to verify reset code:", error)
+    res.status(500).json({ error: "Failed to verify reset code" })
+  }
+})
+
+router.post("/reset-password", async (req: Request, res: Response) {
   const parsed = passwordResetSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code, newPassword } = parsed.data
@@ -613,6 +653,9 @@ router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) 
     role: user.role,
     fullName: user.fullName,
     xp: Number((user as any).experiencePoints || 0),
+    age: (user as any).age,
+    educationalInstitution: (user as any).educationalInstitution,
+    primaryRole: (user as any).primaryRole,
     profile: user.profile,
   })
 })
@@ -638,7 +681,15 @@ router.put("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) 
         educationalInstitution: data.educationalInstitution,
         primaryRole: data.primaryRole,
       },
-      select: { id: true, email: true, role: true, fullName: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        fullName: true,
+        age: true,
+        educationalInstitution: true,
+        primaryRole: true,
+      },
     })
     return res.json(updated)
   } catch (e) {
