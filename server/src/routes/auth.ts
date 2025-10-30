@@ -512,7 +512,7 @@ router.post("/verify-reset-code", async (req: Request, res: Response) => {
   }
 })
 
-router.post("/reset-password", async (req: Request, res: Response) {
+router.post("/reset-password", async (req, res) {
   const parsed = passwordResetSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code, newPassword } = parsed.data

@@ -2,6 +2,7 @@
 import SocialPanel from "@/components/social-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/otp-input"
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -355,14 +356,26 @@ export default function LoginPage() {
             {forgotPasswordStep === "code" && (
               <div className="space-y-6">
                 <p className="text-[#a7a7a7] text-sm text-center">Мы отправили код на <span className="text-white">{email}</span></p>
-                <Input
-                  type="text"
-                  maxLength={6}
-                  placeholder="Код из письма (6 цифр)"
-                  value={resetCode}
-                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
-                  className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white text-center placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a] tracking-[0.5em]"
-                />
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={resetCode}
+                    onChange={(value) => setResetCode(value)}
+                    containerClassName="flex gap-2"
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} className="h-12 w-12" />
+                      <InputOTPSlot index={1} className="h-12 w-12" />
+                      <InputOTPSlot index={2} className="h-12 w-12" />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={3} className="h-12 w-12" />
+                      <InputOTPSlot index={4} className="h-12 w-12" />
+                      <InputOTPSlot index={5} className="h-12 w-12" />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               </div>
             )}
             {forgotPasswordStep === "reset" && (
