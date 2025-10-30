@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 async function verifyAdmin() {
   try {
     const admin = await prisma.user.update({
-      where: { email: 'admin@s7.kz' },
+      where: { email: 'ch.qynon@gmail.com' },
       data: { emailVerified: true }
     })
 

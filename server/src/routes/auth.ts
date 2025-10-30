@@ -124,7 +124,7 @@ router.post("/register", async (req, res) => {
   const passwordHash = await hashPassword(password)
   const anyAdmin = await prisma.user.findFirst({ where: { role: "ADMIN" } })
   const isBootstrapAdmin = !anyAdmin
-  const isSpecialAdmin = email.trim().toLowerCase() === "qynon@mail.ru"
+  const isSpecialAdmin = email.trim().toLowerCase() === "ch.qynon@gmail.com"
 
   // Create user but don't automatically log them in
   const user = await prisma.user.create({
