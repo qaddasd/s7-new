@@ -13,7 +13,7 @@ export function signAccessToken(userId: string, role: "USER" | "ADMIN") {
 
 export function signRefreshToken(userId: string, role: "USER" | "ADMIN") {
   const payload: TokenPayload = { sub: userId, role }
-  return jwt.sign(payload, env.APP_SECRET, { expiresIn: "30d" })
+  return jwt.sign(payload, env.APP_SECRET, { expiresIn: "90d" }) // 90 дней для большего запаса
 }
 
 export function verifyToken(token: string): TokenPayload {

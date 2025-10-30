@@ -313,9 +313,11 @@ router.post("/login", async (req, res) => {
     data: {
       userId: user.id,
       refreshToken,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
     },
   })
+
+  console.log(`[AUTH] User logged in successfully: ${user.email}`)
 
   res.json({
     accessToken,
@@ -405,9 +407,11 @@ router.post("/login-verify", async (req, res) => {
       data: {
         userId: user.id,
         refreshToken,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
       },
     })
+
+    console.log(`[AUTH] User verified and logged in: ${user.email}`)
 
     res.json({
       accessToken,
@@ -605,26 +609,44 @@ router.post("/refresh", async (req, res) => {
   const { refreshToken } = parsed.data
 
   const stored = await prisma.session.findUnique({ where: { refreshToken } })
-  if (!stored || stored.expiresAt < new Date()) return res.status(401).json({ error: "Invalid refresh token" })
+
+  // Добавляем буфер 5 минут для проверки истечения сессии
+  const now = new Date()
+  const bufferTime = 5 * 60 * 1000 // 5 минут в миллисекундах
+
+  if (!stored) {
+    console.log(`[AUTH] Session not found for refresh token`)
+    return res.status(401).json({ error: "Session not found", code: "SESSION_NOT_FOUND" })
+  }
+
+  if (stored.expiresAt.getTime() < (now.getTime() - bufferTime)) {
+    console.log(`[AUTH] Session expired for user ${stored.userId}. Expired at: ${stored.expiresAt}, Current time: ${now}`)
+    // Удаляем истекшую сессию
+    await prisma.session.delete({ where: { id: stored.id } }).catch(() => null)
+    return res.status(401).json({ error: "Session expired", code: "SESSION_EXPIRED" })
+  }
 
   let payload
   try {
     payload = verifyToken(refreshToken)
   } catch (error) {
-    return res.status(401).json({ error: "Invalid refresh token" })
+    console.log(`[AUTH] Invalid refresh token signature`)
+    return res.status(401).json({ error: "Invalid token signature", code: "INVALID_TOKEN" })
   }
 
   const accessToken = signAccessToken(payload.sub, payload.role)
   const newRefreshToken = signRefreshToken(payload.sub, payload.role)
 
+  // Увеличиваем срок действия до 90 дней
   await prisma.session.update({
     where: { refreshToken },
     data: {
       refreshToken: newRefreshToken,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
     },
   })
 
+  console.log(`[AUTH] Successfully refreshed tokens for user ${payload.sub}`)
   res.json({ accessToken, refreshToken: newRefreshToken })
 })
 

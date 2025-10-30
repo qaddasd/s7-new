@@ -7,6 +7,9 @@
   Пароль: admin123
   ⚠️ ОБЯЗАТЕЛЬНО СМЕНИТЕ ПАРОЛЬ ПОСЛЕ ВХОДА!
 
+⚠️ ВАЖНО: Если вы обновляете код после исправления проблемы "Сессия истекла",
+          ОБЯЗАТЕЛЬНО удалите старую БД командами из раздела 2!
+
 =================================================================
 1️⃣ ПЕРВОНАЧАЛЬНАЯ НАСТРОЙКА (выполнить один раз)
 =================================================================
@@ -63,30 +66,38 @@ pm2 startup
 2️⃣ ОБНОВЛЕНИЕ ПРОЕКТА (после git push)
 =================================================================
 
+⚠️ КРИТИЧЕСКИ ВАЖНО: При обновлении после исправления "Сессия истекла"
+   ОБЯЗАТЕЛЬНО удалите старую БД! Иначе проблема останется!
+
 # Подключиться к серверу
 ssh user@s7robotics.space
 
 # Перейти в директорию
 cd /var/www/s7
 
-# БЫСТРЫЙ СПОСОБ - запустить скрипт:
-./QUICK_PRODUCTION_COMMANDS.sh
+# Остановить приложения
+pm2 stop all
 
-# ИЛИ ВРУЧНУЮ:
+# ОБЯЗАТЕЛЬНО: Сохранить и удалить старую БД
+cp prisma/dev.db prisma/dev.db.backup.$(date +%Y%m%d_%H%M%S)
+rm -f prisma/dev.db prisma/dev.db-journal
 
 # Получить изменения
 git pull
 
-# Остановить приложения
-pm2 stop all
+# Очистить кеш
+rm -rf node_modules .next server/node_modules server/dist
 
 # Установить зависимости
 npm install
 cd server && npm install && cd ..
 
-# Применить изменения БД
+# Создать НОВУЮ БД с исправлениями
+npx prisma db push --accept-data-loss
 npx prisma generate
-npx prisma db push
+
+# Создать администратора
+node create-admin.js
 
 # Собрать проекты
 npm run build
@@ -94,9 +105,17 @@ cd server && npm run build && cd ..
 
 # Запустить приложения
 pm2 restart all
+pm2 save
 
-# Проверить статус
+# Проверить статус и логи
 pm2 status
+pm2 logs --lines 50
+
+=================================================================
+БЫСТРАЯ КОМАНДА (все в одну строку):
+=================================================================
+
+cd /var/www/s7 && pm2 stop all && cp prisma/dev.db prisma/dev.db.backup.$(date +%Y%m%d_%H%M%S) && rm -f prisma/dev.db prisma/dev.db-journal && git pull && rm -rf node_modules .next server/node_modules server/dist && npm install && cd server && npm install && cd .. && npx prisma db push --accept-data-loss && npx prisma generate && node create-admin.js && npm run build && cd server && npm run build && cd .. && pm2 restart all && pm2 save && pm2 logs --lines 30
 
 =================================================================
 3️⃣ УПРАВЛЕНИЕ ПРИЛОЖЕНИЯМИ (PM2)
@@ -160,6 +179,19 @@ node create-admin.js
 =================================================================
 5️⃣ УСТРАНЕНИЕ ПРОБЛЕМ
 =================================================================
+
+# ⚠️ ОШИБКА "СЕССИЯ ИСТЕКЛА" - РЕШЕНИЕ:
+# После обновления кода ОБЯЗАТЕЛЬНО пересоздайте БД!
+cd /var/www/s7
+pm2 stop all
+cp prisma/dev.db prisma/dev.db.backup.$(date +%Y%m%d_%H%M%S)
+rm -f prisma/dev.db prisma/dev.db-journal
+npx prisma db push --accept-data-loss
+node create-admin.js
+pm2 restart all
+
+# Проверить логи (должны быть сообщения [AUTH]):
+pm2 logs s7-backend | grep AUTH
 
 # Если backend не работает:
 pm2 logs s7-backend --lines 50
