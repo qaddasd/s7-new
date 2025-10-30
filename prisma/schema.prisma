@@ -1,0 +1,603 @@
+// Prisma schema for S7 production backend
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../server/node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum EnrollmentStatus {
+  active
+  suspended
+  completed
+}
+
+enum PurchaseStatus {
+  pending
+  approved
+  rejected
+  refunded
+}
+
+// Moderation statuses for user submissions
+enum SubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+// Publication status for public events
+enum EventStatus {
+  pending
+  published
+  rejected
+}
+
+enum EventFormat {
+  online
+  offline
+  hybrid
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum AssignmentStatus {
+  submitted
+  graded
+}
+
+enum LessonMediaType {
+  video
+  slide
+  presentation
+  resource
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  passwordHash String
+  fullName    String
+  age         Int?
+  educationalInstitution String?
+  primaryRole String?
+  role        UserRole @default(USER)
+  level       Int      @default(1)
+  experiencePoints Int @default(0)
+  emailVerified Boolean @default(false)
+  banned      Boolean @default(false)
+  bannedReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile     UserProfile?
+  authoredCourses Course[] @relation("CourseAuthor")
+  enrollments Enrollment[]
+  purchases   Purchase[]
+  sessions    Session[]
+  notifications Notification[]
+  achievements UserAchievement[]
+  awardedAchievements UserAchievement[] @relation("AchievementAwarder")
+  teamsCaptain Team[] @relation("TeamCaptain")
+  teamMemberships TeamMembership[]
+  competitionSubmissions CompetitionSubmission[]
+  eventsCreated Event[]
+  byteSizeItems ByteSizeItem[]
+  byteSizeLikes ByteSizeLike[]
+  // Opposite sides
+  eventRegistrations EventRegistration[]
+  authoredQuestions  CourseQuestion[]
+  courseAnswers      CourseAnswer[]
+  // Clubs/Classes (opposite relations)
+  clubsOwned         Club[]            @relation("ClubOwner")
+  clubMentorRoles    ClubMentor[]
+  classEnrollments   ClassEnrollment[]
+  attendanceStudent  Attendance[]      @relation("AttendanceStudent")
+  attendanceMarker   Attendance[]      @relation("AttendanceMarker")
+  assignmentSubmissions AssignmentSubmission[]
+  newsArticles       News[]            @relation("NewsAuthor")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  refreshToken String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  userAgent String?
+  ipAddress String?
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+  avatarUrl String?
+  bio       String?
+  phone     String?
+  socialLinks Json?
+  lastLogin DateTime?
+}
+
+model Course {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  difficulty    String
+  author        User     @relation("CourseAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  authorId      String
+  price         Decimal  @default(0)
+  isFree        Boolean  @default(true)
+  isPublished   Boolean  @default(false)
+  coverImageUrl String?
+  estimatedHours Int?
+  totalModules  Int      @default(0)
+  deliveryMode  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  modules       CourseModule[]
+  enrollments   Enrollment[]
+  purchases     Purchase[]
+  // Opposite side of CourseQuestion.course
+  questions     CourseQuestion[]
+}
+
+model CourseModule {
+  id          String   @id @default(cuid())
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId    String
+  title       String
+  description String?
+  orderIndex  Int
+  isLocked    Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  lessons     Lesson[]
+
+  @@unique([courseId, orderIndex])
+}
+
+model Lesson {
+  id            String   @id @default(cuid())
+  module        CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId      String
+  title         String
+  content       String?
+  contentType   String   @default("text")
+  duration      String?
+  orderIndex    Int
+  isFreePreview Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  videoUrl              String?
+  videoStoragePath      String?
+  presentationUrl       String?
+  presentationStoragePath String?
+  slides                Json?
+
+  enrollments   LessonProgress[]
+
+  @@unique([moduleId, orderIndex])
+}
+
+// Removed LessonMedia separate table for simplicity
+
+model Enrollment {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId   String
+  status     EnrollmentStatus @default(active)
+  progressPercentage Decimal @default(0)
+  enrolledAt DateTime @default(now())
+  completedAt DateTime?
+
+  lessonProgress LessonProgress[]
+
+  @@unique([userId, courseId])
+}
+
+model LessonProgress {
+  id        String   @id @default(cuid())
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  enrollmentId String
+  lesson     Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId   String
+  isCompleted Boolean @default(false)
+  watchTimeSeconds Int @default(0)
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  String
+  amount    Decimal
+  currency  String  @default("KZT")
+  paymentMethod String @default("kaspi")
+  transactionId String?
+  payerFullName String?
+  senderCode  String?
+  metadata    Json?
+  status    PurchaseStatus @default(pending)
+  createdAt DateTime @default(now())
+  confirmedAt DateTime?
+  adminNotes String?
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  message   String
+  type      String
+  metadata  Json?
+  isRead    Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Achievement {
+  id        String   @id @default(cuid())
+  title     String
+  description String
+  iconUrl   String?
+  badgeColor String?
+  criteriaType String
+  criteriaData Json?
+  isActive  Boolean @default(true)
+  pointsValue Int  @default(100)
+  createdAt DateTime @default(now())
+
+  userAchievements UserAchievement[]
+}
+
+model UserAchievement {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  achievementId String
+  earnedAt  DateTime @default(now())
+  awardedBy User?    @relation("AchievementAwarder", fields: [awardedById], references: [id], onDelete: SetNull)
+  awardedById String?
+  adminNote String?
+
+  @@unique([userId, achievementId])
+}
+
+// User-submitted competition participation for moderation
+model CompetitionSubmission {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String
+  description String?
+  projectSummary String?
+  venue       String?
+  placement   String?
+  eventDate   DateTime?
+  imageUrl    String?
+  status      SubmissionStatus @default(pending)
+  createdAt   DateTime @default(now())
+}
+
+// Public events (created by users, moderated by admins)
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  audience    String?
+  contact     String?
+  date        DateTime?
+  imageUrl    String?
+  format      EventFormat @default(offline)
+  isFree      Boolean  @default(true)
+  price       Decimal  @default(0)
+  location    String?
+  url         String?
+  status      EventStatus @default(pending)
+  createdAt   DateTime @default(now())
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+  // Opposite side of EventRegistration.event
+  registrations EventRegistration[]
+}
+
+// User registrations to events/masterclasses
+model EventRegistration {
+  id        String   @id @default(cuid())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  status    SubmissionStatus @default(pending)
+  contactPhone String?
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  description String?
+  captain   User     @relation("TeamCaptain", fields: [captainId], references: [id], onDelete: Restrict)
+  captainId String
+  logoUrl   String?
+  maxMembers Int @default(6)
+  isActive  Boolean @default(true)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  memberships TeamMembership[]
+  competitions Competition[]
+}
+
+model TeamMembership {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String   @default("member")
+  status    String   @default("active")
+  joinedAt  DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+model Competition {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  name      String
+  description String?
+  competitionDate DateTime
+  venue     String?
+  awardsWon String?
+  status    String   @default("upcoming")
+  createdAt DateTime @default(now())
+}
+
+model Club {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  location    String?
+  isActive    Boolean  @default(true)
+  owner       User?    @relation("ClubOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId     String?
+  createdAt   DateTime @default(now())
+
+  classes     ClubClass[]
+  mentors     ClubMentor[]
+}
+
+model ClubClass {
+  id          String   @id @default(cuid())
+  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  clubId      String
+  title       String
+  description String?
+  location    String?
+  createdAt   DateTime @default(now())
+
+  enrollments   ClassEnrollment[]
+  scheduleItems ScheduleItem[]
+  sessions      ClubSession[]
+  resources     ClubResource[]
+  assignments   ClubAssignment[]
+}
+
+model ClubMentor {
+  id        String   @id @default(cuid())
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  clubId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String   @default("mentor")
+  createdAt DateTime @default(now())
+
+  @@unique([clubId, userId])
+}
+
+model ClassEnrollment {
+  id        String   @id @default(cuid())
+  class     ClubClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId   String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+
+  @@unique([classId, userId])
+}
+
+model ScheduleItem {
+  id        String   @id @default(cuid())
+  class     ClubClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId   String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  location  String?
+  createdAt DateTime @default(now())
+  sessions  ClubSession[]
+}
+
+model ClubSession {
+  id             String     @id @default(cuid())
+  class          ClubClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId        String
+  date           DateTime
+  endAt          DateTime?
+  scheduleItem   ScheduleItem? @relation(fields: [scheduleItemId], references: [id], onDelete: SetNull)
+  scheduleItemId String?
+  status         String     @default("scheduled")
+  createdAt      DateTime   @default(now())
+
+  attendances    Attendance[]
+
+  @@index([classId, date])
+  @@unique([classId, date, scheduleItemId])
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  session    ClubSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId  String
+  student    User     @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  studentId  String
+  status     AttendanceStatus @default(present)
+  feedback   String?
+  markedBy   User?    @relation("AttendanceMarker", fields: [markedById], references: [id], onDelete: SetNull)
+  markedById String?
+  markedAt   DateTime @default(now())
+
+  @@unique([sessionId, studentId])
+}
+
+model ClubResource {
+  id          String   @id @default(cuid())
+  class       ClubClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId     String
+  title       String
+  description String?
+  url         String
+  createdAt   DateTime @default(now())
+}
+
+model ClubAssignment {
+  id          String   @id @default(cuid())
+  class       ClubClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classId     String
+  title       String
+  description String?
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String   @id @default(cuid())
+  assignment   ClubAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignmentId String
+  student      User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId    String
+  answerText   String?
+  attachmentUrl String?
+  status       AssignmentStatus @default(submitted)
+  grade        Int?
+  feedback     String?
+  submittedAt  DateTime @default(now())
+  gradedAt     DateTime?
+
+  @@unique([assignmentId, studentId])
+}
+
+// ByteSize short videos (reels)
+model ByteSizeItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  videoUrl    String
+  coverImageUrl String?
+  tags        Json?
+  author      User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId    String?
+  createdAt   DateTime @default(now())
+  views       Int      @default(0)
+  likes       ByteSizeLike[]
+}
+
+model ByteSizeLike {
+  id        String   @id @default(cuid())
+  item      ByteSizeItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId    String
+  // link like to user
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+
+  @@unique([itemId, userId])
+}
+
+// Quiz: questions per course/module/lesson and user answers
+model CourseQuestion {
+  id           String   @id @default(cuid())
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId     String
+  moduleId     String?
+  lessonId     String?
+  text         String
+  options      Json     // array of strings
+  correctIndex Int
+  xpReward     Int      @default(100)
+  author       User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId     String?
+  createdAt    DateTime @default(now())
+  answers      CourseAnswer[]
+}
+
+model CourseAnswer {
+  id           String   @id @default(cuid())
+  question     CourseQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId   String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  selectedIndex Int
+  isCorrect    Boolean
+  createdAt    DateTime @default(now())
+}
+
+// News/Announcements model
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  coverImageUrl String?
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String?
+  author      User?    @relation("NewsAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  
+  attachments NewsAttachment[]
+}
+
+model NewsAttachment {
+  id        String   @id @default(cuid())
+  news      News     @relation(fields: [newsId], references: [id], onDelete: Cascade)
+  newsId    String
+  type      String   // photo, video, presentation, document, link
+  url       String
+  title     String?
+  description String?
+  orderIndex Int     @default(0)
+  createdAt DateTime @default(now())
+}

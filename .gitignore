@@ -1,0 +1,17 @@
+# общие
+node_modules/
+.next/
+.turbo/
+.vercel/
+dist/
+out/
+*.log
+.env
+.env.*
+
+server/node_modules/
+server/dist/
+
+
+package-lock.json
+server/package-lock.json
