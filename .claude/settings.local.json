@@ -1,11 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run build:*)",
-      "Bash(findstr:*)",
-      "Bash(for file in *.ts)",
-      "Bash(do sed -i 's/(req: Request, res: Response)/(req, res)/g' \"$file\")",
-      "Bash(done)"
+      "Bash(dir:*)",
+      "Bash(npx prisma db push)"
     ],
     "deny": [],
     "ask": []
