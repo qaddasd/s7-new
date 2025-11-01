@@ -15,6 +15,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
   const nav = [
     { href: "/admin", label: "Главная", icon: Home },
     { href: "/admin/courses", label: "Курсы", icon: BookOpen },
+    { href: "/admin/kruzhok", label: "Кружки", icon: GraduationCap },
     { href: "/admin/users", label: "Пользователи", icon: Users },
     { href: "/admin/payments", label: "Платежи", icon: CreditCard },
     { href: "/admin/teams", label: "Команды", icon: Users },

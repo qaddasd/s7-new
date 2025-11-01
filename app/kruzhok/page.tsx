@@ -4,7 +4,8 @@ import { apiFetch } from "@/lib/api"
 import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import Link from "next/link"
+import Link from "next/link";
+import CreateKruzhok from "@/components/kruzhok/create-kruzhok";
 
 interface Kruzhok {
   id: string
@@ -38,7 +39,8 @@ export default function UserKruzhokPage() {
   const [loading, setLoading] = useState(true)
   const [showEnrollForm, setShowEnrollForm] = useState(false)
   const [enrollCode, setEnrollCode] = useState("")
-  const [enrolling, setEnrolling] = useState(false)
+  const [enrolling, setEnrolling] = useState(false);
+  const [activeTab, setActiveTab] = useState("my-kruzhoks");
 
   useEffect(() => {
     fetchData()
@@ -104,9 +106,20 @@ export default function UserKruzhokPage() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      <h1 className="text-white text-2xl font-bold mb-6">Мои кружки</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-white text-2xl font-bold">Кружки</h1>
+        <CreateKruzhok onKruzhokCreated={fetchData} />
+      </div>
 
-      {/* My Enrolled Clubs */}
+      <div className="flex space-x-2 border-b border-[#636370]/20 mb-6">
+        <button onClick={() => setActiveTab("my-kruzhoks")} className={`py-2 px-4 text-sm font-medium ${activeTab === "my-kruzhoks" ? "text-white border-b-2 border-[#00a3ff]" : "text-white/60"}`}>Мои кружки</button>
+        <button onClick={() => setActiveTab("all-kruzhoks")} className={`py-2 px-4 text-sm font-medium ${activeTab === "all-kruzhoks" ? "text-white border-b-2 border-[#00a3ff]" : "text-white/60"}`}>Доступные кружки</button>
+        <button onClick={() => setActiveTab("my-requests")} className={`py-2 px-4 text-sm font-medium ${activeTab === "my-requests" ? "text-white border-b-2 border-[#00a3ff]" : "text-white/60"}`}>Мои заявки</button>
+      </div>
+
+      {activeTab === "my-kruzhoks" && (
+        <div>
+          {/* My Enrolled Clubs */}
       {myKruzhoks.length > 0 && (
         <div className="mb-8">
           <h2 className="text-white text-lg font-bold mb-4">Мои кружки ({myKruzhoks.length})</h2>
@@ -135,136 +148,148 @@ export default function UserKruzhokPage() {
         </div>
       )}
 
-      {/* Pending Enrollment Requests */}
-      {myRequests.length > 0 && (
+              </div>
+      )}
+
+      {activeTab === "my-requests" && (
         <div className="mb-8">
-          <h2 className="text-white text-lg font-bold mb-4">Заявки на рассмотрении ({myRequests.length})</h2>
-          <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4">
-            <div className="divide-y divide-[#2a2a35]">
-              {myRequests.map((req) => (
-                <div key={req.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <div className="text-white font-medium">{req.kruzhok.name}</div>
-                    <div className="text-white/60 text-sm">{req.kruzhok.description}</div>
-                    <div className="text-white/40 text-xs mt-1">
-                      Отправлена: {new Date(req.enrolledAt).toLocaleDateString("ru-RU")}
+          {myRequests.length > 0 ? (
+            <>
+              <h2 className="text-white text-lg font-bold mb-4">Заявки на рассмотрении ({myRequests.length})</h2>
+              <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4">
+                <div className="divide-y divide-[#2a2a35]">
+                  {myRequests.map((req) => (
+                    <div key={req.id} className="py-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-white font-medium">{req.kruzhok.name}</div>
+                        <div className="text-white/60 text-sm">{req.kruzhok.description}</div>
+                        <div className="text-white/40 text-xs mt-1">
+                          Отправлена: {new Date(req.enrolledAt).toLocaleDateString("ru-RU")}
+                        </div>
+                      </div>
+                      <div className="bg-[#f59e0b]/20 text-[#f59e0b] text-xs font-medium px-2 py-1 rounded-full">
+                        Ожидание
+                      </div>
                     </div>
-                  </div>
-                  <div className="bg-[#f59e0b]/20 text-[#f59e0b] text-xs font-medium px-2 py-1 rounded-full">
-                    Ожидание
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-white/60">Нет заявок на рассмотрении</div>
+          )}
         </div>
       )}
 
-      {/* Enroll by Code */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white text-lg font-bold">Присоединиться к кружку</h2>
-          <Button
-            onClick={() => setShowEnrollForm(!showEnrollForm)}
-            className="bg-[#00a3ff] text-black hover:bg-[#0088cc]"
-          >
-            {showEnrollForm ? "Отмена" : "Ввести код"}
-          </Button>
-        </div>
+      {activeTab === "all-kruzhoks" && (
+        <div>
+          {/* Enroll by Code */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white text-lg font-bold">Присоединиться к кружку</h2>
+              <Button
+                onClick={() => setShowEnrollForm(!showEnrollForm)}
+                className="bg-[#00a3ff] text-black hover:bg-[#0088cc]"
+              >
+                {showEnrollForm ? "Отмена" : "Ввести код"}
+              </Button>
+            </div>
 
-        {showEnrollForm && (
-          <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 mb-4">
-            <form onSubmit={handleEnrollByCode} className="space-y-3">
-              <div>
-                <label className="text-white text-sm font-medium mb-2 block">Код доступа</label>
-                <Input
-                  type="text"
-                  placeholder="Введите код доступа кружка"
-                  value={enrollCode}
-                  onChange={(e) => setEnrollCode(e.target.value.toUpperCase())}
-                  className="bg-[#1e1e26] border-[#636370]/20 text-white font-mono"
-                  disabled={enrolling}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  disabled={enrolling}
-                  className="bg-[#22c55e] text-black hover:bg-[#16a34a] disabled:opacity-50"
-                >
-                  {enrolling ? "Отправка..." : "Отправить заявку"}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setShowEnrollForm(false)}
-                  className="bg-[#636370] text-white hover:bg-[#4a4a52]"
-                >
-                  Отмена
-                </Button>
-              </div>
-            </form>
-          </div>
-        )}
-      </div>
-
-      {/* Available Clubs */}
-      <div>
-        <h2 className="text-white text-lg font-bold mb-4">Доступные кружки</h2>
-        {loading ? (
-          <div className="text-white/70">Загрузка...</div>
-        ) : allKruzhoks.length === 0 ? (
-          <div className="text-white/60">Нет доступных кружков</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allKruzhoks.map((k) => {
-              const isEnrolled = myKruzhoks.some((m) => m.id === k.id)
-              const hasPendingRequest = myRequests.some((r) => r.kruzhokId === k.id)
-
-              return (
-                <div
-                  key={k.id}
-                  className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 hover:border-[#00a3ff]/50 transition"
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-[#00a3ff] text-black flex items-center justify-center font-semibold flex-shrink-0">
-                      {k.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-bold truncate">{k.name}</h3>
-                      <p className="text-white/60 text-xs truncate">{k.admin?.fullName}</p>
-                    </div>
+            {showEnrollForm && (
+              <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 mb-4">
+                <form onSubmit={handleEnrollByCode} className="space-y-3">
+                  <div>
+                    <label className="text-white text-sm font-medium mb-2 block">Код доступа</label>
+                    <Input
+                      type="text"
+                      placeholder="Введите код доступа кружка"
+                      value={enrollCode}
+                      onChange={(e) => setEnrollCode(e.target.value.toUpperCase())}
+                      className="bg-[#1e1e26] border-[#636370]/20 text-white font-mono"
+                      disabled={enrolling}
+                    />
                   </div>
-                  <p className="text-white/70 text-sm line-clamp-2 mb-3">{k.description}</p>
-                  <div className="flex items-center justify-between text-xs text-white/60 mb-3">
-                    <span>{k._count?.members || 0} участников</span>
-                    {k.isPaid && <span className="text-[#22c55e]">Платный</span>}
-                  </div>
-
-                  {isEnrolled ? (
-                    <div className="bg-[#22c55e]/20 text-[#22c55e] text-xs font-medium px-2 py-1 rounded-full w-full text-center">
-                      Вы участник
-                    </div>
-                  ) : hasPendingRequest ? (
-                    <div className="bg-[#f59e0b]/20 text-[#f59e0b] text-xs font-medium px-2 py-1 rounded-full w-full text-center">
-                      Заявка отправлена
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setEnrollCode(k.accessCode || "")
-                        setShowEnrollForm(true)
-                      }}
-                      className="w-full bg-[#00a3ff] text-black text-xs font-medium px-2 py-1 rounded-full hover:bg-[#0088cc] transition"
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      disabled={enrolling}
+                      className="bg-[#22c55e] text-black hover:bg-[#16a34a] disabled:opacity-50"
                     >
-                      Присоединиться
-                    </button>
-                  )}
-                </div>
-              )
-            })}
+                      {enrolling ? "Отправка..." : "Отправить заявку"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setShowEnrollForm(false)}
+                      className="bg-[#636370] text-white hover:bg-[#4a4a52]"
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Available Clubs */}
+          <div>
+            <h2 className="text-white text-lg font-bold mb-4">Доступные кружки</h2>
+            {loading ? (
+              <div className="text-white/70">Загрузка...</div>
+            ) : allKruzhoks.length === 0 ? (
+              <div className="text-white/60">Нет доступных кружков</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allKruzhoks.map((k) => {
+                  const isEnrolled = myKruzhoks.some((m) => m.id === k.id)
+                  const hasPendingRequest = myRequests.some((r) => r.kruzhokId === k.id)
+
+                  return (
+                    <div
+                      key={k.id}
+                      className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 hover:border-[#00a3ff]/50 transition"
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-[#00a3ff] text-black flex items-center justify-center font-semibold flex-shrink-0">
+                          {k.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-white font-bold truncate">{k.name}</h3>
+                          <p className="text-white/60 text-xs truncate">{k.admin?.fullName}</p>
+                        </div>
+                      </div>
+                      <p className="text-white/70 text-sm line-clamp-2 mb-3">{k.description}</p>
+                      <div className="flex items-center justify-between text-xs text-white/60 mb-3">
+                        <span>{k._count?.members || 0} участников</span>
+                        {k.isPaid && <span className="text-[#22c55e]">Платный</span>}
+                      </div>
+
+                      {isEnrolled ? (
+                        <div className="bg-[#22c55e]/20 text-[#22c55e] text-xs font-medium px-2 py-1 rounded-full w-full text-center">
+                          Вы участник
+                        </div>
+                      ) : hasPendingRequest ? (
+                        <div className="bg-[#f59e0b]/20 text-[#f59e0b] text-xs font-medium px-2 py-1 rounded-full w-full text-center">
+                          Заявка отправлена
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEnrollCode(k.accessCode || "")
+                            setShowEnrollForm(true)
+                          }}
+                          className="w-full bg-[#00a3ff] text-black text-xs font-medium px-2 py-1 rounded-full hover:bg-[#0088cc] transition"
+                        >
+                          Присоединиться
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -324,13 +324,15 @@ router.post(
       // Ұпайларды есептеу
       let points = 0;
       if (isCorrect) {
-        points = question.points;
+        points = question.points || session.quiz.pointsPerQuestion || 1;
         
         // Time bonus
         if (session.quiz.timeBonus && question.timeLimit) {
           const timePercentage = (question.timeLimit - timeSpent / 1000) / question.timeLimit;
+          const bonusPoints = Math.floor(points * timePercentage * 0.5);
+          points += Math.max(0, bonusPoints);
           if (timePercentage > 0) {
-            points += Math.floor(points * timePercentage * 0.5); // 50% қосымша
+// points += Math.floor(points * timePercentage * 0.5); // 50% қосымша (removed as it's now in the line above)
           }
         }
       }

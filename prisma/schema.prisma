@@ -104,6 +104,7 @@ model User {
   courseAnswers      CourseAnswer[]
   // Clubs/Classes (opposite relations)
   clubsOwned         Club[]            @relation("ClubOwner")
+  subscriptions      Subscription[]
   clubMentorRoles    ClubMentor[]
   classEnrollments   ClassEnrollment[]
   attendanceStudent  Attendance[]      @relation("AttendanceStudent")
@@ -384,6 +385,12 @@ model Competition {
 }
 
 model Club {
+  // Existing fields...
+  programId          String?
+  program            KruzhokProgram? @relation(fields: [programId], references: [id])
+  schedule           Json? // { day: string, time: string }[]
+  
+  // Existing relations...
   id          String   @id @default(cuid())
   name        String
   description String?
@@ -489,6 +496,44 @@ model ClubResource {
   description String?
   url         String
   createdAt   DateTime @default(now())
+}
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  type               String   // e.g., "KRUZHOK_MENTOR", "PRO_USER"
+  startDate          DateTime @default(now())
+  endDate            DateTime
+  isActive           Boolean  @default(true)
+  adminNotes         String?
+  
+  @@unique([userId, type])
+}
+
+model KruzhokProgram {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  description        String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  
+  lessons            KruzhokLessonTemplate[]
+  clubs              Club[]
+}
+
+model KruzhokLessonTemplate {
+  id                 String   @id @default(cuid())
+  program            KruzhokProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId          String
+  title              String
+  orderIndex         Int
+  mediaType          LessonMediaType @default(presentation)
+  contentUrl         String? // Link to presentation/scenario
+  scenarioText       String? // Full lesson scenario/script
+  quizId             String? // Link to a separate Quiz model if needed
+  
+  @@unique([programId, orderIndex])
 }
 
 model ClubAssignment {

@@ -49,15 +49,14 @@ export default function Sidebar({
   }, [isCollapsed, onCollapseChange])
 
   const navItems = [
-    { id: "home", label: "Главная", icon: Home },
-    { id: "courses", label: "Курсы", icon: BookOpen },
-    { id: "kruzhok", label: "Кружок", icon: Calendar },
-    { id: "s7-tools", label: "S7 Tools", icon: Wrench },
-    { id: "teams", label: "Команда", icon: Users },
-    { id: "profile", label: "Профиль", icon: User },
-    { id: "masterclass", label: "Мастер классы", icon: GraduationCap },
-    { id: "bytesize", label: "ByteSize", icon: FileText },
-    ...(user?.role === 'admin' ? [{ id: "admin", label: "Админ", icon: Shield }] as const : []),
+    { id: "home", label: "Главная", icon: Home, href: "/" },
+    { id: "courses", label: "Курсы", icon: BookOpen, href: "/courses" },
+    { id: "kruzhok", label: "Кружок", icon: Calendar, href: "/kruzhok" },
+    { id: "s7-tools", label: "S7 Tools", icon: Wrench, href: "/s7-tools" },
+    { id: "teams", label: "Команда", icon: Users, href: "/teams" },
+    { id: "profile", label: "Профиль", icon: User, href: "/profile" },
+    // Removed masterclass and bytesize as they were not mentioned in the new request
+    ...(user?.role === 'admin' ? [{ id: "admin", label: "Админ", icon: Shield, href: "/admin" }] as const : []),
   ]
 
   return (
@@ -115,13 +114,7 @@ export default function Sidebar({
                 <div
                   key={item.id}
                   onClick={() => {
-                    if (item.id === 'admin') {
-                      router.push('/admin')
-                    } else if (item.id === 'kruzhok') {
-                      router.push('/kruzhok')
-                    } else {
-                      onTabChange(item.id)
-                    }
+                    router.push(item.href)
                     setIsMobileMenuOpen(false)
                   }}
                   className={`group relative flex items-center ${isCollapsed ? "justify-center p-3" : "space-x-3 px-4 py-3"} rounded-lg transition-all duration-200 cursor-pointer animate-slide-up ${
@@ -157,22 +150,6 @@ export default function Sidebar({
           </div>
         </nav>
         <div className="p-2 border-t border-[#1f1f1f] space-y-1">
-          {user?.role === 'admin' && (
-            <div
-              onClick={() => router.push('/admin')}
-              className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-200 cursor-pointer text-[#a7a7a7] hover:text-white hover:bg-[#141414]"
-            >
-              <Shield className="w-5 h-5 transition-transform duration-200 group-hover:scale-105" />
-              {!isCollapsed && (
-                <span className="text-sm ml-3">Админ панель</span>
-              )}
-              {isCollapsed && (
-                <div className="absolute left-full ml-2 px-2 py-1 bg-[#141414] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                  Админ панель
-                </div>
-              )}
-            </div>
-          )}
           <div
             onClick={handleLogout}
             className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-200 cursor-pointer text-[#ff4757] hover:text-white hover:bg-[#141414]"

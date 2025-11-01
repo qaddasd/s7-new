@@ -234,8 +234,8 @@ router.post(
 
       // Ұпайларды есептеу
       const score =
-        correctMatches * attempt.game.pointsPerMatch -
-        mistakes * attempt.game.penaltyPerMistake;
+        correctMatches * (attempt.game.pointsPerMatch || 1) -
+        mistakes * (attempt.game.penaltyPerMistake || 0);
 
       // Әрекетті жаңарту
       const updated = await prisma.matchingAttempt.update({
