@@ -51,7 +51,7 @@ export default function Sidebar({
   const navItems = [
     { id: "home", label: "Главная", icon: Home },
     { id: "courses", label: "Курсы", icon: BookOpen },
-    { id: "clubs", label: "Кружок", icon: Calendar },
+    { id: "kruzhok", label: "Кружок", icon: Calendar },
     { id: "s7-tools", label: "S7 Tools", icon: Wrench },
     { id: "teams", label: "Команда", icon: Users },
     { id: "profile", label: "Профиль", icon: User },
@@ -117,6 +117,8 @@ export default function Sidebar({
                   onClick={() => {
                     if (item.id === 'admin') {
                       router.push('/admin')
+                    } else if (item.id === 'kruzhok') {
+                      router.push('/kruzhok')
                     } else {
                       onTabChange(item.id)
                     }

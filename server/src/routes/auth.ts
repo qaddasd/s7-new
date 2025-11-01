@@ -63,7 +63,7 @@ setInterval(() => {
 const DEV_AUTH = process.env.DEV_AUTH === "1"
 
 if (DEV_AUTH) {
-  router.post("/login", async (req, res) => {
+  router.post("/login", async (req: Request, res: Response) => {
     const { email, password } = (req.body || {}) as { email?: string; password?: string }
     if (email === "1" && password === "1") {
       const accessToken = signAccessToken("dev-admin", "ADMIN")
@@ -83,7 +83,7 @@ if (DEV_AUTH) {
     return res.status(401).json({ error: "Invalid credentials" })
   })
 
-  router.post("/refresh", async (req, res) => {
+  router.post("/refresh", async (req: Request, res: Response) => {
     const { refreshToken } = (req.body || {}) as { refreshToken?: string }
     if (!refreshToken) return res.status(400).json({ error: "Missing refresh token" })
     try {
@@ -96,11 +96,11 @@ if (DEV_AUTH) {
     }
   })
 
-  router.post("/logout", async (_req, res) => {
+  router.post("/logout", async (_req: Request, res: Response) => {
     return res.json({ success: true })
   })
 
-  router.get("/me", requireAuth, async (req, res) => {
+  router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" })
     return res.json({
       id: "dev-admin",
@@ -113,7 +113,7 @@ if (DEV_AUTH) {
   })
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", async (req: Request, res: Response) => {
   const parsed = registerSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, password, fullName, age, educationalInstitution, primaryRole } = parsed.data
@@ -124,7 +124,7 @@ router.post("/register", async (req, res) => {
   const passwordHash = await hashPassword(password)
   const anyAdmin = await prisma.user.findFirst({ where: { role: "ADMIN" } })
   const isBootstrapAdmin = !anyAdmin
-  const isSpecialAdmin = email.trim().toLowerCase() === "ch.qynon@gmail.com"
+  const isSpecialAdmin = email.trim().toLowerCase() === "qynon@mail.ru"
 
   // Create user but don't automatically log them in
   const user = await prisma.user.create({
@@ -178,7 +178,7 @@ router.post("/register", async (req, res) => {
   })
 })
 
-router.post("/send-verification", async (req, res) => {
+router.post("/send-verification", async (req: Request, res: Response) => {
   const { email } = req.body as { email?: string }
   
   if (!email) {
@@ -223,7 +223,7 @@ router.post("/send-verification", async (req, res) => {
   }
 })
 
-router.post("/verify-email", async (req, res) => {
+router.post("/verify-email", async (req: Request, res: Response) => {
   const parsed = verifyEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code } = parsed.data
@@ -272,7 +272,7 @@ router.post("/verify-email", async (req, res) => {
   }
 })
 
-router.post("/login", async (req, res) => {
+router.post("/login", async (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, password } = parsed.data
@@ -313,11 +313,9 @@ router.post("/login", async (req, res) => {
     data: {
       userId: user.id,
       refreshToken,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
     },
   })
-
-  console.log(`[AUTH] User logged in successfully: ${user.email}`)
 
   res.json({
     accessToken,
@@ -328,14 +326,11 @@ router.post("/login", async (req, res) => {
       role: user.role,
       fullName: user.fullName,
       xp: Number((user as any).experiencePoints || 0),
-      age: (user as any).age,
-      educationalInstitution: (user as any).educationalInstitution,
-      primaryRole: (user as any).primaryRole,
     },
   })
 })
 
-router.post("/login-verify", async (req, res) => {
+router.post("/login-verify", async (req: Request, res: Response) => {
   const parsed = verifyEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code } = parsed.data
@@ -407,11 +402,9 @@ router.post("/login-verify", async (req, res) => {
       data: {
         userId: user.id,
         refreshToken,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
       },
     })
-
-    console.log(`[AUTH] User verified and logged in: ${user.email}`)
 
     res.json({
       accessToken,
@@ -434,7 +427,7 @@ router.post("/login-verify", async (req, res) => {
 })
 
 // Password reset request with rate limiting
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", async (req: Request, res: Response) => {
   const parsed = passwordResetRequestSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email } = parsed.data
@@ -478,45 +471,8 @@ router.post("/forgot-password", async (req, res) => {
   }
 })
 
-router.post("/verify-reset-code", async (req, res) => {
-  const parsed = verifyEmailSchema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
-  const { email, code } = parsed.data
-
-  try {
-    const stored = verificationCodes.get(email)
-    if (!stored || stored.type !== 'password-reset') {
-      return res.status(400).json({ error: "Reset code not found or expired" })
-    }
-
-    if (stored.expiresAt < new Date()) {
-      verificationCodes.delete(email)
-      return res.status(400).json({ error: "Reset code expired" })
-    }
-
-    if (stored.attempts >= 3) {
-      verificationCodes.delete(email)
-      return res.status(400).json({ error: "Too many failed attempts. Please request a new code." })
-    }
-
-    stored.attempts += 1
-    verificationCodes.set(email, stored)
-
-    if (stored.code !== code) {
-      return res.status(400).json({ error: "Invalid reset code" })
-    }
-
-    stored.attempts = 0
-    verificationCodes.set(email, stored)
-
-    res.json({ success: true, attemptsRemaining: 3 - stored.attempts })
-  } catch (error) {
-    console.error("Failed to verify reset code:", error)
-    res.status(500).json({ error: "Failed to verify reset code" })
-  }
-})
-
-router.post("/reset-password", async (req, res) => {
+// Password reset with attempt limiting
+router.post("/reset-password", async (req: Request, res: Response) => {
   const parsed = passwordResetSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { email, code, newPassword } = parsed.data
@@ -567,7 +523,7 @@ router.post("/reset-password", async (req, res) => {
 })
 
 // Change password (authenticated users)
-router.post("/change-password", requireAuth, async (req, res) => {
+router.post("/change-password", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   
   const parsed = changePasswordSchema.safeParse(req.body)
@@ -603,54 +559,36 @@ router.post("/change-password", requireAuth, async (req, res) => {
   }
 })
 
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", async (req: Request, res: Response) => {
   const parsed = refreshSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { refreshToken } = parsed.data
 
   const stored = await prisma.session.findUnique({ where: { refreshToken } })
-
-  // Добавляем буфер 5 минут для проверки истечения сессии
-  const now = new Date()
-  const bufferTime = 5 * 60 * 1000 // 5 минут в миллисекундах
-
-  if (!stored) {
-    console.log(`[AUTH] Session not found for refresh token`)
-    return res.status(401).json({ error: "Session not found", code: "SESSION_NOT_FOUND" })
-  }
-
-  if (stored.expiresAt.getTime() < (now.getTime() - bufferTime)) {
-    console.log(`[AUTH] Session expired for user ${stored.userId}. Expired at: ${stored.expiresAt}, Current time: ${now}`)
-    // Удаляем истекшую сессию
-    await prisma.session.delete({ where: { id: stored.id } }).catch(() => null)
-    return res.status(401).json({ error: "Session expired", code: "SESSION_EXPIRED" })
-  }
+  if (!stored || stored.expiresAt < new Date()) return res.status(401).json({ error: "Invalid refresh token" })
 
   let payload
   try {
     payload = verifyToken(refreshToken)
   } catch (error) {
-    console.log(`[AUTH] Invalid refresh token signature`)
-    return res.status(401).json({ error: "Invalid token signature", code: "INVALID_TOKEN" })
+    return res.status(401).json({ error: "Invalid refresh token" })
   }
 
   const accessToken = signAccessToken(payload.sub, payload.role)
   const newRefreshToken = signRefreshToken(payload.sub, payload.role)
 
-  // Увеличиваем срок действия до 90 дней
   await prisma.session.update({
     where: { refreshToken },
     data: {
       refreshToken: newRefreshToken,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 90), // 90 дней
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
     },
   })
 
-  console.log(`[AUTH] Successfully refreshed tokens for user ${payload.sub}`)
   res.json({ accessToken, refreshToken: newRefreshToken })
 })
 
-router.post("/logout", async (req, res) => {
+router.post("/logout", async (req: Request, res: Response) => {
   const parsed = refreshSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const { refreshToken } = parsed.data
@@ -658,7 +596,7 @@ router.post("/logout", async (req, res) => {
   res.json({ success: true })
 })
 
-router.get("/me", requireAuth, async (req, res) => {
+router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
@@ -675,9 +613,6 @@ router.get("/me", requireAuth, async (req, res) => {
     role: user.role,
     fullName: user.fullName,
     xp: Number((user as any).experiencePoints || 0),
-    age: (user as any).age,
-    educationalInstitution: (user as any).educationalInstitution,
-    primaryRole: (user as any).primaryRole,
     profile: user.profile,
   })
 })
@@ -689,7 +624,7 @@ const profileUpdateSchema = z.object({
   primaryRole: z.string().optional(),
 })
 
-router.put("/me", requireAuth, async (req, res) => {
+router.put("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ error: "Unauthorized" })
   const parsed = profileUpdateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -703,15 +638,7 @@ router.put("/me", requireAuth, async (req, res) => {
         educationalInstitution: data.educationalInstitution,
         primaryRole: data.primaryRole,
       },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        fullName: true,
-        age: true,
-        educationalInstitution: true,
-        primaryRole: true,
-      },
+      select: { id: true, email: true, role: true, fullName: true },
     })
     return res.json(updated)
   } catch (e) {

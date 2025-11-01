@@ -30,7 +30,7 @@ const purchaseSchema = z.object({
   metadata: z.record(z.any()).optional(),
 })
 
-router.get("/:courseId/analytics", requireAuth, async (req, res) => {
+router.get("/:courseId/analytics", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })
   const { courseId } = req.params
   const [totalPurchases, approvedPurchases, pendingPurchases, enrollmentsCount, activeEnrollments, completedEnrollments, revenue] = await Promise.all([
@@ -55,7 +55,7 @@ const questionSchema = z.object({
   lessonId: z.string().optional(),
 })
 
-router.post("/:courseId/questions", requireAuth, async (req, res) => {
+router.post("/:courseId/questions", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })
   const { courseId } = req.params
   const parsed = questionSchema.safeParse(req.body)
@@ -78,7 +78,7 @@ router.post("/:courseId/questions", requireAuth, async (req, res) => {
   res.status(201).json(q)
 })
 
-router.get("/:courseId/questions", optionalAuth, async (req, res) => {
+router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params
   const course = await prisma.course.findUnique({ where: { id: courseId }, select: { id: true, isFree: true, price: true } })
   if (!course) return res.status(404).json({ error: "Course not found" })
@@ -96,7 +96,7 @@ router.get("/:courseId/questions", optionalAuth, async (req, res) => {
   res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId })))
 })
 
-router.post("/questions/:questionId/answer", requireAuth, async (req, res) => {
+router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { questionId } = req.params
   const { selectedIndex } = z.object({ selectedIndex: z.number().int().min(0) }).parse(req.body)
   const q = await (prisma as any).courseQuestion.findUnique({ where: { id: questionId } })
@@ -113,7 +113,7 @@ router.post("/questions/:questionId/answer", requireAuth, async (req, res) => {
   res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded })
 })
 
-router.get("/:courseId/questions/analytics", requireAuth, async (req, res) => {
+router.get("/:courseId/questions/analytics", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })
   const { courseId } = req.params
   const qs = await (prisma as any).courseQuestion.findMany({ where: { courseId }, include: { answers: true } })
@@ -127,7 +127,7 @@ router.get("/:courseId/questions/analytics", requireAuth, async (req, res) => {
   res.json(data)
 })
 
-router.get("/:courseId/questions/answers", requireAuth, async (req, res) => {
+router.get("/:courseId/questions/answers", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })
   const { courseId } = req.params
   const where: any = { courseId }
@@ -153,7 +153,7 @@ const progressSchema = z.object({
   watchTimeSeconds: z.number().int().nonnegative().optional(),
 })
 
-router.get("/", async (req, res) => {
+router.get("/", async (req: Request, res: Response) => {
   const search = (req.query.search as string | undefined)?.trim()
   const filter = (req.query.filter as string | undefined) // 'free' | 'paid' | 'all'
 
@@ -200,7 +200,7 @@ router.get("/", async (req, res) => {
   )
 })
 
-router.get("/continue", requireAuth, async (req, res) => {
+router.get("/continue", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const enrollments = (await prisma.enrollment.findMany({
     where: { userId: req.user!.id },
     orderBy: { enrolledAt: "desc" },
@@ -237,7 +237,7 @@ router.get("/continue", requireAuth, async (req, res) => {
   res.json(items)
 })
 
-router.get("/:courseId", optionalAuth, async (req, res) => {
+router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const courseId = req.params.courseId
   const course = await prisma.course.findUnique({
     where: { id: courseId },
@@ -303,7 +303,7 @@ router.get("/:courseId", optionalAuth, async (req, res) => {
   })
 })
 
-router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req, res) => {
+router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, lessonId } = req.params
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
   if (!lesson || lesson.module.courseId !== courseId) return res.status(404).json({ error: "Lesson not found" })
@@ -327,7 +327,7 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req, res) => {
   })
 })
 
-router.post("/:courseId/purchase", requireAuth, async (req, res) => {
+router.post("/:courseId/purchase", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params
   const parsed = purchaseSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
@@ -351,7 +351,7 @@ router.post("/:courseId/purchase", requireAuth, async (req, res) => {
   res.status(201).json(purchase)
 })
 
-router.get("/:courseId/progress", requireAuth, async (req, res) => {
+router.get("/:courseId/progress", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params
 
   const enrollment = await prisma.enrollment.findFirst({
@@ -366,7 +366,7 @@ router.get("/:courseId/progress", requireAuth, async (req, res) => {
   })
 })
 
-router.post("/:courseId/lessons/:lessonId/progress", requireAuth, async (req, res) => {
+router.post("/:courseId/lessons/:lessonId/progress", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, lessonId } = req.params
   const parsed = progressSchema.safeParse({ ...req.body, lessonId })
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })

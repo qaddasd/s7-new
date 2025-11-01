@@ -83,11 +83,12 @@ export default function Page() {
       const existing = existingRaw ? JSON.parse(existingRaw) : { modules: [] }
       const mergedModules = modules.map((m) => {
         const prev = (existing.modules || []).find((pm: any) => pm.id === m.id)
-        return {
-          id: m.id,
-          title: m.title,
-          remoteId: prev?.remoteId,
-          lessons: prev?.lessons || []
+        // Preserve remoteId and lessons from existing draft
+        return { 
+          id: m.id, 
+          title: m.title, 
+          remoteId: prev?.remoteId, 
+          lessons: prev?.lessons || [] 
         }
       })
       const draft = {
@@ -97,11 +98,11 @@ export default function Page() {
         difficulty,
         modules: mergedModules,
         price: free ? 0 : price,
-        lastUpdated: new Date().toISOString(),
       }
       localStorage.setItem(draftKey, JSON.stringify(draft))
       localStorage.setItem("s7_admin_course_draft", JSON.stringify(draft))
-
+      
+      // Очистка старых черновиков (более 7 дней)
       const cleanupThreshold = Date.now() - (7 * 24 * 60 * 60 * 1000)
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
@@ -115,6 +116,7 @@ export default function Page() {
               }
             }
           } catch (e) {
+            // Игнорируем ошибки парсинга
           }
         }
       }
@@ -428,125 +430,115 @@ export default function Page() {
 
     try {
       let created: any = null
-
-      const payload = {
-        title: title.trim(),
-        description: title.trim(),
-        difficulty,
-        price: free ? 0 : Number(price || 0),
-        isFree: free,
-        isPublished: true,
-        modules: finalModules.map((m, mi) => ({
-          ...( (typeof (m as any).remoteId === 'string' && (m as any).remoteId) ? { id: (m as any).remoteId as string } : {} ),
-          title: (m as any).title || `Модуль ${mi + 1}`,
-          orderIndex: mi,
-          lessons: (m as any).lessons?.map((l: any, li: number) => ({
-            ...( (typeof (l as any).remoteId === 'string' && (l as any).remoteId) ? { id: (l as any).remoteId as string } : {} ),
-            title: l.title || `Урок ${li + 1}`,
-            duration: l.time || l.duration || undefined,
-            orderIndex: li,
-            isFreePreview: false,
-            content: l.content || undefined,
-            contentType: "text",
-            videoUrl: l.videoUrl || undefined,
-            presentationUrl: l.presentationUrl || undefined,
-            slides: Array.isArray(l.slideUrls) && l.slideUrls.length
-              ? l.slideUrls.map((u: string) => ({ url: u }))
-              : undefined,
-          })) || [],
-        })),
-      }
-
-      created = await apiFetch<any>(
-        editId ? `/api/admin/courses/${encodeURIComponent(editId)}?sync=ids` : "/api/admin/courses",
-        { method: editId ? "PUT" : "POST", body: JSON.stringify(payload) }
-      )
-
-      if (!created || !created.id) {
-        throw new Error("Сервер не вернул ID курса")
-      }
+      try {
+        const payload = {
+          title: title.trim(),
+          description: title.trim(),
+          difficulty,
+          price: free ? 0 : Number(price || 0),
+          isFree: free,
+          isPublished: true,
+          modules: finalModules.map((m, mi) => ({
+            ...( (typeof (m as any).remoteId === 'string' && (m as any).remoteId) ? { id: (m as any).remoteId as string } : {} ),
+            title: (m as any).title || `Модуль ${mi + 1}`,
+            orderIndex: mi,
+            lessons: (m as any).lessons?.map((l: any, li: number) => ({
+              ...( (typeof (l as any).remoteId === 'string' && (l as any).remoteId) ? { id: (l as any).remoteId as string } : {} ),
+              title: l.title || `Урок ${li + 1}`,
+              duration: l.time || l.duration || undefined,
+              orderIndex: li,
+              isFreePreview: false,
+              content: l.content || undefined,
+              contentType: "text",
+              videoUrl: l.videoUrl || undefined,
+              presentationUrl: l.presentationUrl || undefined,
+              slides: Array.isArray(l.slideUrls) && l.slideUrls.length
+                ? l.slideUrls.map((u: string) => ({ url: u }))
+                : undefined,
+            })) || [],
+          })),
+        }
+        created = await apiFetch<any>(
+          editId ? `/api/admin/courses/${encodeURIComponent(editId)}?sync=ids` : "/api/admin/courses",
+          { method: editId ? "PUT" : "POST", body: JSON.stringify(payload) }
+        )
         try {
           // Update the draft with the new remote IDs from the backend
           const draftRaw = draftKey ? localStorage.getItem(draftKey) : localStorage.getItem("s7_admin_course_draft")
           const draft = draftRaw ? JSON.parse(draftRaw) : null
           if (created?.id && draft && Array.isArray(draft.modules)) {
+            // Update course ID
             draft.courseId = created.id
-            draft.lastUpdated = new Date().toISOString()
-
+            
+            // Update module and lesson IDs based on orderIndex to ensure proper mapping
             const createdModules = (created.modules || []).slice().sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
-
             for (let mi = 0; mi < draft.modules.length; mi++) {
               const dMod = draft.modules[mi]
-              const cMod = createdModules[mi]
-
-              if (!dMod) continue
-
-              if (cMod && cMod.id) {
-                dMod.remoteId = cMod.id
-              }
-
+              // Find the corresponding created module by orderIndex
+              const cMod = createdModules.find((m: any) => m.orderIndex === mi)
+              if (!dMod || !cMod) continue
+              dMod.remoteId = cMod.id
+              
+              // Update lesson IDs based on orderIndex
+              const createdLessons = (cMod.lessons || []).slice().sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
               const dLessons: any[] = Array.isArray(dMod.lessons) ? dMod.lessons : []
-              if (cMod && Array.isArray(cMod.lessons)) {
-                const createdLessons = cMod.lessons.slice().sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
-
-                for (let li = 0; li < dLessons.length; li++) {
-                  const dLesson = dLessons[li]
-                  const cLesson = createdLessons[li]
-
-                  if (!dLesson) continue
-
-                  if (cLesson && cLesson.id) {
-                    dLesson.remoteId = cLesson.id
-                  }
-
-
-                  const text = (dLesson.quizQuestion || "").trim()
-                  const opts: string[] = Array.isArray(dLesson.quizOptions) ? dLesson.quizOptions.filter((s: any) => typeof s === 'string' && s.trim()).map((s: string) => s.trim()) : []
-                  const correctIndex = typeof dLesson.quizCorrectIndex === 'number' ? dLesson.quizCorrectIndex : -1
-                  const xpReward = typeof dLesson.quizXp === 'number' ? dLesson.quizXp : 100
-
-                  if (text && opts.length >= 2 && correctIndex >= 0 && correctIndex < opts.length && cMod && cMod.id && cLesson && cLesson.id) {
-                    try {
-                      await apiFetch(`/api/admin/courses/${created.id}/questions`, {
-                        method: "POST",
-                        body: JSON.stringify({
-                          text,
-                          options: opts,
-                          correctIndex,
-                          xpReward,
-                          moduleId: cMod.id,
-                          lessonId: cLesson.id,
-                        }),
-                      })
-                      toast({ title: "Вопрос сохранен", description: "Вопрос успешно добавлен к уроку" } as any)
-                    } catch (e: any) {
-                      console.error("Failed to save question:", e)
-                      toast({ title: "Ошибка сохранения вопроса", description: e?.message || "Не удалось сохранить вопрос", variant: "destructive" as any })
-                    }
+              for (let li = 0; li < dLessons.length; li++) {
+                const dLesson = dLessons[li]
+                // Find the corresponding created lesson by orderIndex
+                const cLesson = createdLessons.find((l: any) => l.orderIndex === li)
+                if (!dLesson || !cLesson) continue
+                dLesson.remoteId = cLesson.id
+                
+                // Save quiz questions if they exist
+                const text = (dLesson.quizQuestion || "").trim()
+                const opts: string[] = Array.isArray(dLesson.quizOptions) ? dLesson.quizOptions.filter((s: any) => typeof s === 'string' && s.trim()).map((s: string) => s.trim()) : []
+                const correctIndex = typeof dLesson.quizCorrectIndex === 'number' ? dLesson.quizCorrectIndex : -1
+                const xpReward = typeof dLesson.quizXp === 'number' ? dLesson.quizXp : 100
+                if (text && opts.length >= 2 && correctIndex >= 0 && correctIndex < opts.length) {
+                  try {
+                    await apiFetch(`/api/admin/courses/${created.id}/questions`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        text,
+                        options: opts,
+                        correctIndex,
+                        xpReward,
+                        moduleId: cMod.id,
+                        lessonId: cLesson.id,
+                      }),
+                    })
+                    toast({ title: "Вопрос сохранен", description: "Вопрос успешно добавлен к уроку" } as any)
+                  } catch (e: any) {
+                    console.error("Failed to save question:", e)
+                    toast({ title: "Ошибка сохранения вопроса", description: e?.message || "Не удалось сохранить вопрос", variant: "destructive" as any })
                   }
                 }
               }
             }
-
             localStorage.setItem("s7_admin_course_draft", JSON.stringify(draft))
             if (draftKey) localStorage.setItem(draftKey, JSON.stringify(draft))
           }
         } catch (e) {
           console.error("Failed to update draft with remote IDs:", e)
         }
+      } catch (e: any) {
+        console.warn("Backend create course failed:", e?.message)
+        throw e
+      }
 
       const raw = localStorage.getItem("s7_admin_courses")
       const list = raw ? JSON.parse(raw) : []
-      const courseForCards = {
-        id: created.id,
-        title: created.title,
-        difficulty: created.difficulty,
-        author,
-        price: free ? 0 : price,
-        modules: (created.modules || []).map((m: any) => ({ id: m.id, title: m.title, lessons: (m.lessons || []).map((l: any) => ({ id: l.id, title: l.title })) })),
-        published: true,
-      }
-
+      const courseForCards = created?.id
+        ? {
+            id: created.id,
+            title: created.title,
+            difficulty: created.difficulty,
+            author,
+            price: free ? 0 : price,
+            modules: (created.modules || []).map((m: any) => ({ id: m.id, title: m.title, lessons: (m.lessons || []).map((l: any) => ({ id: l.id, title: l.title })) })),
+            published: true,
+          }
+        : newCourse
       if (editId) {
         const idx = list.findIndex((c: any) => c.id === editId)
         if (idx !== -1) list[idx] = courseForCards
@@ -563,9 +555,7 @@ export default function Page() {
         if (Array.isArray(fresh)) {
           localStorage.setItem("s7_admin_courses", JSON.stringify(fresh))
         }
-      } catch (e: any) {
-        console.warn("Failed to refresh courses list:", e)
-      }
+      } catch {}
 
       try {
         const db = listCourses()
@@ -573,25 +563,13 @@ export default function Page() {
         if (i >= 0) db[i] = courseForCards as any
         else db.push(courseForCards as any)
         saveCourses(db as any)
-      } catch (e: any) {
-        console.warn("Failed to save to local DB:", e)
-      }
+      } catch {}
 
-      if (!editId) {
-        localStorage.removeItem(draftKey)
-        localStorage.removeItem("s7_admin_course_default_id")
-      }
+      localStorage.removeItem(draftKey)
+    } catch {}
 
-      toast({ title: "Курс сохранён", description: `Курс "${created.title}" успешно ${editId ? 'обновлен' : 'создан'}` } as any)
-      router.push("/admin/courses")
-    } catch (e: any) {
-      console.error("Failed to publish course:", e)
-      toast({
-        title: "Ошибка публикации курса",
-        description: e?.message || "Не удалось опубликовать курс. Попробуйте еще раз.",
-        variant: "destructive" as any
-      })
-    }
+    toast({ title: "Курс сохранён" } as any)
+    router.push("/admin/courses")
   }
 
   return (

@@ -2,7 +2,6 @@
 import SocialPanel from "@/components/social-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/otp-input"
 import Image from "next/image"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -13,10 +12,9 @@ import { RegisterVerification } from "@/components/auth/register-verification"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, register, updateProfile, refreshUser } = useAuth()
+  const { login, register, updateProfile } = useAuth()
   const { user, loading } = useAuth() as any
   const [isLogin, setIsLogin] = useState(true)
-  const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
@@ -26,11 +24,6 @@ export default function LoginPage() {
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false)
   const [requiresRegisterVerification, setRequiresRegisterVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState("")
-  const [forgotPasswordStep, setForgotPasswordStep] = useState<"request" | "code" | "reset">("request")
-  const [resetCode, setResetCode] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [resetCountdown, setResetCountdown] = useState(0)
 
   useEffect(() => {
     if (!loading && user) {
@@ -40,16 +33,29 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      await login(email.trim(), password)
-      toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
-      router.push("/dashboard")
-    } catch (e: any) {
-      if (e?.message && e.message.includes("Email не подтверждён")) {
-        setRequiresEmailVerification(true)
-        setVerificationEmail(email.trim())
-      } else {
-        toast({ title: "Ошибка входа", description: e?.message || "Проверьте почту и пароль", variant: "destructive" as any })
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка входа")
       }
+      
+      if (data.requiresEmailVerification) {
+        setRequiresEmailVerification(true)
+        setVerificationEmail(data.email)
+      } else {
+        // Direct login (for dev mode)
+        await login(email.trim(), password)
+        toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
+        router.push("/dashboard")
+      }
+    } catch (e: any) {
+      toast({ title: "Ошибка входа", description: e?.message || "Проверьте почту и пароль", variant: "destructive" as any })
     }
   }
 
@@ -100,100 +106,29 @@ export default function LoginPage() {
   }
 
   const handleLoginVerificationSuccess = async (data: any) => {
+    // Set tokens and user data
     localStorage.setItem("accessToken", data.accessToken)
     localStorage.setItem("refreshToken", data.refreshToken)
-    await refreshUser()
-    toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
+    
+    // Redirect to dashboard
     router.push("/dashboard")
+    router.refresh()
   }
 
   const handleRegisterVerificationSuccess = async (data: any) => {
+    // Set tokens and user data
     localStorage.setItem("accessToken", data.accessToken)
     localStorage.setItem("refreshToken", data.refreshToken)
-    await refreshUser()
-    toast({ title: "Регистрация успешна", description: "Добро пожаловать!" })
+    
+    // Redirect to dashboard
     router.push("/dashboard")
+    router.refresh()
   }
 
   const handleBackToLogin = () => {
     setRequiresEmailVerification(false)
     setRequiresRegisterVerification(false)
     setVerificationEmail("")
-    setIsForgotPassword(false)
-    setForgotPasswordStep("request")
-    setResetCode("")
-    setNewPassword("")
-    setConfirmPassword("")
-  }
-
-  const handleRequestReset = async () => {
-    if (!email) {
-      toast({ title: "Ошибка", description: "Пожалуйста, введите email", variant: "destructive" as any })
-      return
-    }
-    try {
-      const response = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email })
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Ошибка запроса сброса пароля")
-      toast({ title: "Код отправлен", description: "Проверьте вашу почту для получения кода сброса пароля" })
-      setForgotPasswordStep("code")
-      setResetCountdown(60)
-    } catch (e: any) {
-      toast({ title: "Ошибка", description: e?.message || "Не удалось отправить код сброса пароля", variant: "destructive" as any })
-    }
-  }
-
-  const handleVerifyResetCode = async () => {
-    if (resetCode.length !== 6) {
-      toast({ title: "Неверный код", description: "Код должен содержать 6 символов", variant: "destructive" as any })
-      return
-    }
-    try {
-      const response = await fetch("/api/auth/verify-reset-code", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, code: resetCode })
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || "Неверный код")
-      }
-      setForgotPasswordStep("reset")
-    } catch (e: any) {
-      toast({ title: "Ошибка", description: e?.message || "Неверный код сброса пароля", variant: "destructive" as any })
-    }
-  }
-
-  const handleResetPassword = async () => {
-    if (!newPassword || !confirmPassword) {
-      toast({ title: "Ошибка", description: "Пожалуйста, заполните все поля", variant: "destructive" as any })
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      toast({ title: "Ошибка", description: "Пароли не совпадают", variant: "destructive" as any })
-      return
-    }
-    if (newPassword.length < 8) {
-      toast({ title: "Ошибка", description: "Пароль должен содержать минимум 8 символов", variant: "destructive" as any })
-      return
-    }
-    try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, code: resetCode, newPassword })
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Ошибка сброса пароля")
-      toast({ title: "Успешно", description: "Пароль успешно изменен" })
-      handleBackToLogin()
-    } catch (e: any) {
-      toast({ title: "Ошибка", description: e?.message || "Не удалось сбросить пароль", variant: "destructive" as any })
-    }
   }
 
   if (requiresEmailVerification) {
@@ -215,18 +150,18 @@ export default function LoginPage() {
         </div>
 
         <SocialPanel />
-        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
+        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
           <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
           <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
         </div>
-        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
+        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
           <div className="text-white font-medium">Обновление</div>
           <div className="text-white text-2xl font-bold">1.0</div>
           <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
         </div>
         <div
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-          style={{ animationDelay: "400ms" }}
+          style={{ animationDelay: "1800ms" }}
         >
           <div className="text-[#636370] text-xs text-center">
             <div>Version 0.1</div>
@@ -256,18 +191,18 @@ export default function LoginPage() {
         </div>
 
         <SocialPanel />
-        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
+        <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
           <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
           <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
         </div>
-        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
+        <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
           <div className="text-white font-medium">Обновление</div>
           <div className="text-white text-2xl font-bold">1.0</div>
           <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
         </div>
         <div
           className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-          style={{ animationDelay: "400ms" }}
+          style={{ animationDelay: "1800ms" }}
         >
           <div className="text-[#636370] text-xs text-center">
             <div>Version 0.1</div>
@@ -280,20 +215,20 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 relative bg-dots-pattern">
-      <div className={`${isLogin && !isForgotPassword ? "mb-12" : "mb-16"} animate-slide-up`} style={{ animationDelay: "200ms" }}>
+      <div className={`${isLogin ? "mb-12" : "mb-16"} animate-slide-up`} style={{ animationDelay: "200ms" }}>
         <Image src="/logo-s7.png" alt="S7 Robotics Logo" width={80} height={80} className="mx-auto" />
       </div>
 
       <div
-        className={`w-full max-w-sm bg-[#0b0b0b] border border-dashed border-[#1f1f1f] rounded-2xl ${isLogin && !isForgotPassword ? "p-6" : "p-7"} backdrop-blur-[1px] transition-all duration-500 ease-in-out hover:bg-[#141414] hover:border-[#2a2a2a] animate-slide-up`}
+        className={`w-full max-w-sm bg-[#0b0b0b] border border-dashed border-[#1f1f1f] rounded-2xl ${isLogin ? "p-6" : "p-7"} backdrop-blur-[1px] transition-all duration-500 ease-in-out hover:bg-[#141414] hover:border-[#2a2a2a] animate-slide-up`}
         style={{ animationDelay: "400ms" }}
       >
-        <h1 className={`text-white text-3xl font-medium text-center ${isLogin && !isForgotPassword ? "mb-6" : "mb-7"} transition-all duration-500 tracking-tight`}>
-          {isForgotPassword ? "Сброс пароля" : (isLogin ? "Вход" : "Регистрация")}
+        <h1 className={`text-white text-3xl font-medium text-center ${isLogin ? "mb-6" : "mb-7"} transition-all duration-300 tracking-tight`}>
+          {isLogin ? "Вход" : "Регистрация"}
         </h1>
 
         <div>
-          <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isForgotPassword ? "max-h-0 opacity-0 -translate-y-4 mb-0" : (!isLogin ? "max-h-[500px] opacity-100 translate-y-0 mb-6" : "max-h-0 opacity-0 -translate-y-4 mb-0")}`}>
+          <div className={`transition-all duration-500 ease-in-out overflow-hidden ${!isLogin ? "max-h-[500px] opacity-100 translate-y-0 mb-6" : "max-h-0 opacity-0 -translate-y-4 mb-0"}`}>
             <div className="space-y-6">
               <div className="relative animate-slide-up" style={{ animationDelay: "600ms" }}>
                 <Input
@@ -337,74 +272,7 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-
-          <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isForgotPassword ? "max-h-[500px] opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"}`}>
-            {forgotPasswordStep === "request" && (
-              <div className="space-y-6">
-                <div className="relative">
-                  <Input
-                    type="email"
-                    placeholder="Почта"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
-                  />
-                  <i className="bi bi-envelope absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7]"></i>
-                </div>
-              </div>
-            )}
-            {forgotPasswordStep === "code" && (
-              <div className="space-y-6">
-                <p className="text-[#a7a7a7] text-sm text-center">Мы отправили код на <span className="text-white">{email}</span></p>
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={resetCode}
-                    onChange={(value) => setResetCode(value)}
-                    containerClassName="flex gap-2"
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} className="h-12 w-12" />
-                      <InputOTPSlot index={1} className="h-12 w-12" />
-                      <InputOTPSlot index={2} className="h-12 w-12" />
-                    </InputOTPGroup>
-                    <InputOTPSeparator />
-                    <InputOTPGroup>
-                      <InputOTPSlot index={3} className="h-12 w-12" />
-                      <InputOTPSlot index={4} className="h-12 w-12" />
-                      <InputOTPSlot index={5} className="h-12 w-12" />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              </div>
-            )}
-            {forgotPasswordStep === "reset" && (
-              <div className="space-y-6">
-                <div className="relative">
-                  <Input
-                    type="password"
-                    placeholder="Новый пароль"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
-                  />
-                  <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7]"></i>
-                </div>
-                <div className="relative">
-                  <Input
-                    type="password"
-                    placeholder="Подтвердите пароль"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
-                  />
-                  <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7]"></i>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className={`space-y-6 transition-all duration-500 ease-in-out ${isForgotPassword ? "max-h-0 opacity-0 -translate-y-4 overflow-hidden" : "max-h-[500px] opacity-100 translate-y-0"}`}>
+          <div className="space-y-6">
             <div className="relative animate-slide-up" style={{ animationDelay: "700ms" }}>
               <Input
                 type="email"
@@ -428,60 +296,47 @@ export default function LoginPage() {
           </div>
         </div>
         <Button
-          onClick={isForgotPassword ? (forgotPasswordStep === "request" ? handleRequestReset : forgotPasswordStep === "code" ? handleVerifyResetCode : handleResetPassword) : (isLogin ? handleLogin : handleRegister)}
-          className={`w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full ${isLogin && !isForgotPassword ? "mt-8" : "mt-8"} transition-all duration-500 transform hover:scale-102 active:scale-95 animate-slide-up`}
+          onClick={isLogin ? handleLogin : handleRegister}
+          className={`w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full ${isLogin ? "mt-8" : "mt-8"} transition-all duration-300 transform hover:scale-102 active:scale-95 animate-slide-up`}
           style={{ animationDelay: "900ms" }}
         >
-          {isForgotPassword ? (forgotPasswordStep === "request" ? "Отправить код" : forgotPasswordStep === "code" ? "Подтвердить код" : "Сбросить пароль") : (isLogin ? "Войти" : "Зарегистрироваться")}
+          {isLogin ? "Войти" : "Зарегистрироваться"}
         </Button>
 
-        {isLogin && !isForgotPassword && (
-          <div className="text-center mt-3 animate-slide-up transition-all duration-500" style={{ animationDelay: "1000ms" }}>
+        {isLogin && (
+          <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
             <button
-              onClick={() => setIsForgotPassword(true)}
-              className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-500"
+              onClick={() => router.push(`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ''}`)}
+              className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300"
             >
               Забыли пароль?
             </button>
           </div>
         )}
 
-        {isForgotPassword && (
-          <div className="text-center mt-3 transition-all duration-500">
-            <button
-              onClick={handleBackToLogin}
-              className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-500"
-            >
-              Назад к входу
-            </button>
-          </div>
-        )}
-
-        {!isForgotPassword && (
-          <div className="text-center mt-6 animate-slide-up transition-all duration-500" style={{ animationDelay: "1000ms" }}>
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-500 transform hover:scale-101"
-            >
-              {isLogin ? "Нет аккаунта? Зарегистрируйтесь" : "Войти"}
-            </button>
-          </div>
-        )}
+        <div className="text-center mt-6 animate-slide-up" style={{ animationDelay: "1000ms" }}>
+          <button
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300 transform hover:scale-101"
+          >
+            {isLogin ? "Нет аккаунта? Зарегистрируйтесь" : "Войти"}
+          </button>
+        </div>
       </div>
 
       <SocialPanel />
-      <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "300ms" }}>
+      <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
         <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
         <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
       </div>
-      <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "350ms" }}>
+      <div className="absolute bottom-6 right-6 text-right animate-slide-up" style={{ animationDelay: "1600ms" }}>
         <div className="text-white font-medium">Обновление</div>
         <div className="text-white text-2xl font-bold">1.0</div>
         <div className="text-[#a7a7a7] text-sm">Новые плюшки</div>
       </div>
       <div
         className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
-        style={{ animationDelay: "400ms" }}
+        style={{ animationDelay: "1800ms" }}
       >
         <div className="text-[#636370] text-xs text-center">
           <div>Version 0.1</div>

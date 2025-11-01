@@ -7,8 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts --out-dir dist",
     "start": "node dist/index.js",
-    "test-email": "tsx src/utils/test-email.ts",
-    "postinstall": "cd .. && npx prisma generate"
+    "test-email": "tsx src/utils/test-email.ts"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

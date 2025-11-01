@@ -1,10 +1,10 @@
 ﻿export const social = {
-  telegram: "https://t.me/s7robotics",         // e.g. https://t.me/<username>
-  whatsapp: "https://wa.me/77760457776",      // use digits-only for wa.me
-  phone: "+77760457776",                      // human-readable phone, used for tel:
-  email: "info@s7robotics.kz",                 // email address
-  instagram: "https://instagram.com/s7robotics", // optional
-  vk: "https://vk.com/s7robotics",             // optional
+  telegram: "https://t.me/s7robotics",         
+  whatsapp: "https://wa.me/77760457776",      
+  phone: "+77760457776",                      
+  email: "support@s7robotics.space",                
+  instagram: "https://instagram.com/s7.robotics", 
+  vk: "https://vk.com/s7robotics",             
 }
 
 export function linkFor(type: keyof typeof social): string {

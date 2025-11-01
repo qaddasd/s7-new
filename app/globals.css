@@ -72,27 +72,6 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-
-  --color-bg: #0a0a0a;
-  --color-surface-1: #0b0b0b;
-  --color-surface-2: #0f0f0f;
-  --color-surface-3: #121212;
-  --color-text-1: #ffffff;
-  --color-text-2: #cfcfcf;
-  --color-text-3: #a7a7a7;
-  --color-text-4: #6b6b6b;
-  --color-text-5: #4a4a4a;
-  --color-border-1: #1f1f1f;
-  --color-border-2: #1a1a1a;
-  --color-border-hover-1: #2a2a2a;
-  --color-border-hover-2: #3a3a3a;
-  --color-accent-warm: #F3E6A2;
-  --color-accent-warm-2: #e0a96d;
-  --grad-hero-from: #7CF8E5;
-  --grad-hero-to: #C3FBFF;
-  --easing: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur-fast: 200ms;
-  --dur-mid: 300ms;
 }
 
 @theme inline {
@@ -201,12 +180,12 @@
 }
 
 .animate-slide-up {
-  animation: slideUp 0.3s ease-out forwards;
+  animation: slideUp 0.6s ease-out forwards;
   opacity: 0;
 }
 
 .animate-slide-in-bottom {
-  animation: slideInFromBottom 0.4s ease-out forwards;
+  animation: slideInFromBottom 0.8s ease-out forwards;
   opacity: 0;
 }
 
@@ -217,24 +196,6 @@
 
 .animate-pulse-slow {
   animation: pulse 2s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-slide-up,
-  .animate-slide-in-bottom,
-  .animate-fade-in-scale,
-  .animate-pulse-slow,
-  .animate-fade-in,
-  .animate-fade-in-up,
-  .animate-slide-in-left,
-  .animate-slide-up-delayed,
-  .animate-pulse-glow,
-  .notification-enter,
-  .notification-exit {
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
 }
 
 .notification-enter {
@@ -324,39 +285,6 @@
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slide-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
 .animate-pulse-glow {
   animation: pulseGlow 2s ease-in-out infinite;
 }
@@ -364,19 +292,6 @@
 .animate-slide-up-delayed {
   animation: slideUpDelayed 0.8s ease-out 0.3s forwards;
   opacity: 0;
-}
-
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out;
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-slide-in-left {
-  animation: slide-in-left 0.5s ease-out;
 }
 
 @media (max-width: 768px) {
@@ -445,70 +360,3 @@ body::before {
 ::-webkit-scrollbar-track { background: #0a0a0a; }
 ::-webkit-scrollbar-thumb { background: #1f1f1f; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #2a2a2a; }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-2);
-  color: var(--color-text-2);
-  border-radius: 999px;
-  transition: all var(--dur-fast) ease-out;
-  cursor: pointer;
-}
-.btn:hover {
-  background: #141414;
-  border-color: var(--color-border-hover-1);
-  color: #fff;
-}
-
-.card-design {
-  position: relative;
-  background: var(--color-surface-1);
-  border: 1px dashed var(--color-border-1);
-  border-radius: 20px;
-  padding: 24px;
-  overflow: hidden;
-}
-.card-design__aura {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity var(--dur-mid) ease-out;
-}
-.card-design:hover .card-design__aura {
-  opacity: 1;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  font-size: 11px;
-  border-radius: 999px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-2);
-  color: #dcdcdc;
-  font-family: var(--font-jetbrains-mono), monospace;
-}
-
-.link-dotted {
-  position: relative;
-  padding-right: 14px;
-}
-.link-dotted::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 14px;
-  bottom: -2px;
-  border-bottom: 1px dotted var(--color-border-1);
-}
-.link-dotted:hover::after {
-  border-bottom-color: var(--color-border-hover-1);
-}

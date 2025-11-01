@@ -17,14 +17,13 @@ async function createAdmin() {
 
     // Create admin user
     const hashedPassword = await bcrypt.hash('admin123', 10)
-
+    
     const admin = await prisma.user.create({
       data: {
-        email: 'ch.qynon@gmail.com',
+        email: 'admin@s7.kz',
         passwordHash: hashedPassword,
-        fullName: 'Qynon Admin',
+        fullName: 'Admin User',
         role: 'ADMIN',
-        emailVerified: true,
         profile: {
           create: {
             bio: 'System Administrator'

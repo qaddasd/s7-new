@@ -148,7 +148,7 @@ router.get("/:id", async (req, res: Response) => {
 router.use(requireAuth, requireAdmin)
 
 // GET /api/news/admin/all - Get all news including drafts (admin only)
-router.get("/admin/all", async (req, res) => {
+router.get("/admin/all", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 20
@@ -198,7 +198,7 @@ router.get("/admin/all", async (req, res) => {
 })
 
 // POST /api/news - Create news (admin only)
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parsed = createNewsSchema.safeParse(req.body)
     if (!parsed.success) {
@@ -257,7 +257,7 @@ router.post("/", async (req, res) => {
 })
 
 // PUT /api/news/:id - Update news (admin only)
-router.put("/:id", async (req, res) => {
+router.put("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
     const parsed = updateNewsSchema.safeParse(req.body)
@@ -335,7 +335,7 @@ router.put("/:id", async (req, res) => {
 })
 
 // DELETE /api/news/:id - Delete news (admin only)
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
 
@@ -359,7 +359,7 @@ router.delete("/:id", async (req, res) => {
 })
 
 // PATCH /api/news/:id/publish - Toggle publish status (admin only)
-router.patch("/:id/publish", async (req, res) => {
+router.patch("/:id/publish", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
     const { published } = req.body

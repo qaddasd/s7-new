@@ -23,7 +23,7 @@ function normalizeMediaUrl(u?: string | null): string | undefined {
 const viewCounters = new Map<string, number>()
 const lastViewByIp: Map<string, number> = new Map()
 
-router.get("/", optionalAuth, async (req, res) => {
+router.get("/", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const includeLiked = Boolean(req.user)
   const items = await (prisma as any).byteSizeItem.findMany({
     orderBy: { createdAt: "desc" },
@@ -59,7 +59,7 @@ router.get("/", optionalAuth, async (req, res) => {
   )
 })
 
-router.post("/:id/like", requireAuth, async (req, res) => {
+router.post("/:id/like", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const id = req.params.id
   const existing = await (prisma as any).byteSizeLike.findUnique({ where: { itemId_userId: { itemId: id, userId: req.user!.id } } }).catch(
     () => null
@@ -74,7 +74,7 @@ router.post("/:id/like", requireAuth, async (req, res) => {
   res.json({ liked, likesCount: count })
 })
 
-router.post("/:id/view", async (req, res) => {
+router.post("/:id/view", async (req: Request, res: Response) => {
   const id = req.params.id
   const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || (req.socket?.remoteAddress || "")
   const key = `${ip}|${id}`

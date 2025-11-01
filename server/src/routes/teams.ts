@@ -5,7 +5,7 @@ import type { AuthenticatedRequest } from "../types"
 
 export const router = Router()
 
-router.get("/", async (_req, res) => {
+router.get("/", async (_req: Request, res: Response) => {
   const teams = await prisma.team.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -27,7 +27,7 @@ router.get("/", async (_req, res) => {
   )
 })
 
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const {
     name,
     description,
@@ -60,7 +60,7 @@ router.post("/", requireAuth, async (req, res) => {
   res.status(201).json(team)
 })
 
-router.post("/:teamId/join", requireAuth, async (req, res) => {
+router.post("/:teamId/join", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { teamId } = req.params
   const { telegram, whatsapp } = (req.body || {}) as { telegram?: string; whatsapp?: string }
   const team = await prisma.team.findUnique({ where: { id: teamId } })
@@ -89,7 +89,7 @@ router.post("/:teamId/join", requireAuth, async (req, res) => {
   res.status(201).json({ status: membership.status })
 })
 
-router.get("/mine", requireAuth, async (req, res) => {
+router.get("/mine", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const list = await prisma.teamMembership.findMany({
     where: { userId: req.user!.id },
     orderBy: { joinedAt: "desc" },
@@ -98,7 +98,7 @@ router.get("/mine", requireAuth, async (req, res) => {
   res.json(list.map((m) => ({ id: m.id, role: m.role, status: m.status, joinedAt: m.joinedAt, team: { id: m.teamId, name: (m as any).team?.name, description: (m as any).team?.description } })))
 })
 
-router.get("/:teamId/members", requireAuth, async (req, res) => {
+router.get("/:teamId/members", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { teamId } = req.params
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { captainId: true } })
   if (!team) return res.status(404).json({ error: "Team not found" })
@@ -127,7 +127,7 @@ router.get("/:teamId/members", requireAuth, async (req, res) => {
   )
 })
 
-router.put("/:teamId/members/:membershipId", requireAuth, async (req, res) => {
+router.put("/:teamId/members/:membershipId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { teamId, membershipId } = req.params
   const team = await prisma.team.findUnique({ where: { id: teamId }, select: { captainId: true } })
   if (!team) return res.status(404).json({ error: "Team not found" })

@@ -18,7 +18,7 @@ const clubCreateSchema = z.object({
   location: z.string().optional(),
 })
 
-router.get("/mine", async (req, res) => {
+router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id
   const isAdmin = req.user!.role === "ADMIN"
   const where = isAdmin
@@ -46,7 +46,7 @@ router.get("/mine", async (req, res) => {
   res.json(clubs)
 })
 
-router.post("/", async (req, res) => {
+router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   const parsed = clubCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -76,7 +76,7 @@ async function ensureAdminOrClubMentorOrOwner(userId: string, role: string | und
   return (club.mentors as any[]).some((m: any) => m.userId === userId)
 }
 
-router.post("/:clubId/classes", async (req, res) => {
+router.post("/:clubId/classes", async (req: AuthenticatedRequest, res: Response) => {
   const { clubId } = req.params
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
@@ -98,7 +98,7 @@ router.post("/:clubId/classes", async (req, res) => {
 const mentorAssignSchema = z.object({ userId: z.string().min(1) })
 const mentorAssignByEmailSchema = z.object({ email: z.string().email() })
 
-router.post("/:clubId/mentors", async (req, res) => {
+router.post("/:clubId/mentors", async (req: AuthenticatedRequest, res: Response) => {
   const { clubId } = req.params
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
@@ -113,7 +113,7 @@ router.post("/:clubId/mentors", async (req, res) => {
   log("mentor.upsert", { clubId, userId: parsed.data.userId })
 })
 
-router.post("/:clubId/mentors-by-email", async (req, res) => {
+router.post("/:clubId/mentors-by-email", async (req: AuthenticatedRequest, res: Response) => {
   const { clubId } = req.params
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
@@ -137,7 +137,7 @@ const classUpdateSchema = z.object({
   location: z.string().optional(),
 })
 
-router.patch("/classes/:classId", async (req, res) => {
+router.patch("/classes/:classId", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -151,7 +151,7 @@ router.patch("/classes/:classId", async (req, res) => {
   log("class.update", { id: classId })
 })
 
-router.delete("/classes/:classId", async (req, res) => {
+router.delete("/classes/:classId", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -195,7 +195,7 @@ async function isEnrolled(userId: string, classId: string): Promise<boolean> {
   return Boolean(e)
 }
 
-router.get("/classes/:classId/resources", async (req, res) => {
+router.get("/classes/:classId/resources", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -205,7 +205,7 @@ router.get("/classes/:classId/resources", async (req, res) => {
   res.json(items)
 })
 
-router.post("/classes/:classId/resources", async (req, res) => {
+router.post("/classes/:classId/resources", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -218,7 +218,7 @@ router.post("/classes/:classId/resources", async (req, res) => {
   log("resource.create", { id: r.id, classId })
 })
 
-router.delete("/resources/:resourceId", async (req, res) => {
+router.delete("/resources/:resourceId", async (req: AuthenticatedRequest, res: Response) => {
   const { resourceId } = req.params
   const r = await db.clubResource.findUnique({ where: { id: resourceId }, include: { class: { include: { club: true } } } })
   if (!r) return res.status(404).json({ error: "Resource not found" })
@@ -229,7 +229,7 @@ router.delete("/resources/:resourceId", async (req, res) => {
   log("resource.delete", { id: resourceId })
 })
 
-router.get("/classes/:classId/assignments", async (req, res) => {
+router.get("/classes/:classId/assignments", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -239,7 +239,7 @@ router.get("/classes/:classId/assignments", async (req, res) => {
   res.json(list)
 })
 
-router.post("/classes/:classId/assignments", async (req, res) => {
+router.post("/classes/:classId/assignments", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -254,7 +254,7 @@ router.post("/classes/:classId/assignments", async (req, res) => {
   log("assignment.create", { id: a.id, classId })
 })
 
-router.patch("/assignments/:assignmentId", async (req, res) => {
+router.patch("/assignments/:assignmentId", async (req: AuthenticatedRequest, res: Response) => {
   const { assignmentId } = req.params
   const a = await db.clubAssignment.findUnique({ where: { id: assignmentId }, include: { class: { include: { club: true } } } })
   if (!a) return res.status(404).json({ error: "Assignment not found" })
@@ -272,7 +272,7 @@ router.patch("/assignments/:assignmentId", async (req, res) => {
   log("assignment.update", { id: assignmentId })
 })
 
-router.delete("/assignments/:assignmentId", async (req, res) => {
+router.delete("/assignments/:assignmentId", async (req: AuthenticatedRequest, res: Response) => {
   const { assignmentId } = req.params
   const a = await db.clubAssignment.findUnique({ where: { id: assignmentId }, include: { class: { include: { club: true } } } })
   if (!a) return res.status(404).json({ error: "Assignment not found" })
@@ -283,7 +283,7 @@ router.delete("/assignments/:assignmentId", async (req, res) => {
   log("assignment.delete", { id: assignmentId })
 })
 
-router.get("/assignments/:assignmentId/submissions", async (req, res) => {
+router.get("/assignments/:assignmentId/submissions", async (req: AuthenticatedRequest, res: Response) => {
   const { assignmentId } = req.params
   const a = await db.clubAssignment.findUnique({ where: { id: assignmentId }, include: { class: { include: { club: true } } } })
   if (!a) return res.status(404).json({ error: "Assignment not found" })
@@ -293,7 +293,7 @@ router.get("/assignments/:assignmentId/submissions", async (req, res) => {
   res.json(subs)
 })
 
-router.post("/assignments/:assignmentId/submissions", async (req, res) => {
+router.post("/assignments/:assignmentId/submissions", async (req: AuthenticatedRequest, res: Response) => {
   const { assignmentId } = req.params
   const a = await db.clubAssignment.findUnique({ where: { id: assignmentId }, include: { class: true } })
   if (!a) return res.status(404).json({ error: "Assignment not found" })
@@ -311,7 +311,7 @@ router.post("/assignments/:assignmentId/submissions", async (req, res) => {
   log("submission.upsert", { id: sub.id, assignmentId })
 })
 
-router.patch("/submissions/:submissionId/grade", async (req, res) => {
+router.patch("/submissions/:submissionId/grade", async (req: AuthenticatedRequest, res: Response) => {
   const { submissionId } = req.params
   const sub = await db.assignmentSubmission.findUnique({ where: { id: submissionId }, include: { assignment: { include: { class: { include: { club: true } } } } } })
   if (!sub) return res.status(404).json({ error: "Submission not found" })
@@ -324,7 +324,7 @@ router.patch("/submissions/:submissionId/grade", async (req, res) => {
   log("submission.grade", { id: submissionId, assignmentId: sub.assignmentId })
 })
 
-router.post("/classes/:classId/enroll", async (req, res) => {
+router.post("/classes/:classId/enroll", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -343,7 +343,7 @@ router.post("/classes/:classId/enroll", async (req, res) => {
 
 const enrollByEmailSchema = z.object({ email: z.string().email() })
 
-router.post("/classes/:classId/enroll-by-email", async (req, res) => {
+router.post("/classes/:classId/enroll-by-email", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -361,7 +361,7 @@ router.post("/classes/:classId/enroll-by-email", async (req, res) => {
   res.status(201).json(e)
 })
 
-router.delete("/classes/:classId/enroll/:userId", async (req, res) => {
+router.delete("/classes/:classId/enroll/:userId", async (req: AuthenticatedRequest, res: Response) => {
   const { classId, userId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -379,13 +379,13 @@ const scheduleSchema = z.object({
   location: z.string().optional(),
 })
 
-router.get("/classes/:classId/schedule", async (req, res) => {
+router.get("/classes/:classId/schedule", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const items = await db.scheduleItem.findMany({ where: { classId }, orderBy: { dayOfWeek: "asc" } })
   res.json(items)
 })
 
-router.post("/classes/:classId/schedule", async (req, res) => {
+router.post("/classes/:classId/schedule", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
   if (!cls) return res.status(404).json({ error: "Class not found" })
@@ -398,7 +398,7 @@ router.post("/classes/:classId/schedule", async (req, res) => {
   log("schedule.create", { id: s.id, classId })
 })
 
-router.delete("/schedule/:scheduleItemId", async (req, res) => {
+router.delete("/schedule/:scheduleItemId", async (req: AuthenticatedRequest, res: Response) => {
   const { scheduleItemId } = req.params
   const si = await db.scheduleItem.findUnique({ where: { id: scheduleItemId }, include: { class: { include: { club: true } } } })
   if (!si) return res.status(404).json({ error: "Schedule item not found" })
@@ -411,7 +411,7 @@ router.delete("/schedule/:scheduleItemId", async (req, res) => {
 
 const generateSchema = z.object({ from: z.string(), to: z.string() })
 
-router.post("/classes/:classId/sessions/generate", async (req, res) => {
+router.post("/classes/:classId/sessions/generate", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const { from, to } = generateSchema.parse(req.body)
   const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true, scheduleItems: true } })
@@ -446,7 +446,7 @@ router.post("/classes/:classId/sessions/generate", async (req, res) => {
   log("sessions.generate", { classId, from, to, created: created.length })
 })
 
-router.get("/classes/:classId/sessions", async (req, res) => {
+router.get("/classes/:classId/sessions", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
   const { from, to } = (req.query || {}) as any
   const where: any = { classId }
@@ -460,7 +460,7 @@ const attendanceSchema = z.object({
   marks: z.array(z.object({ studentId: z.string(), status: z.enum(["present", "absent", "late", "excused"]), feedback: z.string().optional() }))
 })
 
-router.post("/sessions/:sessionId/attendance", async (req, res) => {
+router.post("/sessions/:sessionId/attendance", async (req: AuthenticatedRequest, res: Response) => {
   const { sessionId } = req.params
   const session = await db.clubSession.findUnique({ where: { id: sessionId }, include: { class: { include: { club: true } } } })
   if (!session) return res.status(404).json({ error: "Session not found" })

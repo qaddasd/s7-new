@@ -41,17 +41,12 @@ export async function sendVerificationEmail(email: string, code: string): Promis
       background-color: #0a0a0a;
       color: #ffffff;
       margin: 0;
-      padding: 20px;
-    }
-    .email-wrapper {
-      background-color: #0a0a0a;
-      min-height: 100vh;
-      padding: 40px 20px;
+      padding: 0;
     }
     .container {
       max-width: 600px;
       margin: 0 auto;
-      padding: 30px;
+      padding: 20px;
       background-color: #0b0b0b;
       border: 1px dashed #1f1f1f;
       border-radius: 20px;
@@ -83,50 +78,36 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     }
     .footer {
       text-align: center;
-      padding: 30px 0 20px;
+      padding: 20px 0;
       color: #a7a7a7;
       font-size: 14px;
-      border-top: 1px dashed #1f1f1f;
-      margin-top: 30px;
     }
-    .contact-info {
-      margin: 20px 0;
-      padding: 15px;
-      background-color: #0f0f0f;
-      border-radius: 10px;
-      font-size: 13px;
-      color: #cfcfcf;
-    }
-    .contact-info a {
-      color: #F3E6A2;
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #F3E6A2;
+      color: #000000;
       text-decoration: none;
-    }
-    .contact-info a:hover {
-      text-decoration: underline;
+      border-radius: 999px;
+      font-weight: bold;
+      margin: 10px 0;
     }
   </style>
 </head>
-<body style="background-color: #0a0a0a;">
-  <div class="email-wrapper">
-    <div class="container">
-      <div class="header">
-        <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
-        <h1>Подтверждение почты</h1>
-      </div>
-      <div class="content">
-        <p>Здравствуйте!</p>
-        <p>Для завершения входа в систему S7 Robotics, пожалуйста, введите следующий код подтверждения:</p>
-        <div class="code">${code}</div>
-        <p>Если вы не запрашивали этот код, просто проигнорируйте это сообщение.</p>
-      </div>
-      <div class="footer">
-        <p>© 2025 S7 Robotics. Все права защищены.</p>
-        <div class="contact-info">
-          <p><strong>Контактная информация:</strong></p>
-          <p>Email: <a href="mailto:support@s7robotics.space">support@s7robotics.space</a></p>
-          <p>Сайт: <a href="https://s7robotics.space">https://s7robotics.space</a></p>
-        </div>
-      </div>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
+      <h1>Подтверждение почты</h1>
+    </div>
+    <div class="content">
+      <p>Здравствуйте!</p>
+      <p>Для завершения входа в систему S7 Robotics, пожалуйста, введите следующий код подтверждения:</p>
+      <div class="code">${code}</div>
+      <p>Если вы не запрашивали этот код, просто проигнорируйте это сообщение.</p>
+    </div>
+    <div class="footer">
+      <p>© 2025 S7 Robotics. Все права защищены.</p>
     </div>
   </div>
 </body>
@@ -154,17 +135,12 @@ export async function sendPasswordResetEmail(email: string, code: string): Promi
       background-color: #0a0a0a;
       color: #ffffff;
       margin: 0;
-      padding: 20px;
-    }
-    .email-wrapper {
-      background-color: #0a0a0a;
-      min-height: 100vh;
-      padding: 40px 20px;
+      padding: 0;
     }
     .container {
       max-width: 600px;
       margin: 0 auto;
-      padding: 30px;
+      padding: 20px;
       background-color: #0b0b0b;
       border: 1px dashed #1f1f1f;
       border-radius: 20px;
@@ -196,50 +172,26 @@ export async function sendPasswordResetEmail(email: string, code: string): Promi
     }
     .footer {
       text-align: center;
-      padding: 30px 0 20px;
+      padding: 20px 0;
       color: #a7a7a7;
       font-size: 14px;
-      border-top: 1px dashed #1f1f1f;
-      margin-top: 30px;
-    }
-    .contact-info {
-      margin: 20px 0;
-      padding: 15px;
-      background-color: #0f0f0f;
-      border-radius: 10px;
-      font-size: 13px;
-      color: #cfcfcf;
-    }
-    .contact-info a {
-      color: #F3E6A2;
-      text-decoration: none;
-    }
-    .contact-info a:hover {
-      text-decoration: underline;
     }
   </style>
 </head>
-<body style="background-color: #0a0a0a;">
-  <div class="email-wrapper">
-    <div class="container">
-      <div class="header">
-        <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
-        <h1>Сброс пароля</h1>
-      </div>
-      <div class="content">
-        <p>Здравствуйте!</p>
-        <p>Вы запросили сброс пароля для аккаунта S7 Robotics. Используйте следующий код для сброса пароля:</p>
-        <div class="code">${code}</div>
-        <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это сообщение.</p>
-      </div>
-      <div class="footer">
-        <p>© 2025 S7 Robotics. Все права защищены.</p>
-        <div class="contact-info">
-          <p><strong>Контактная информация:</strong></p>
-          <p>Email: <a href="mailto:info@s7robotics.space">info@s7robotics.space</a></p>
-          <p>Сайт: <a href="https://s7robotics.space">https://s7robotics.space</a></p>
-        </div>
-      </div>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
+      <h1>Сброс пароля</h1>
+    </div>
+    <div class="content">
+      <p>Здравствуйте!</p>
+      <p>Вы запросили сброс пароля для аккаунта S7 Robotics. Используйте следующий код для сброса пароля:</p>
+      <div class="code">${code}</div>
+      <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это сообщение.</p>
+    </div>
+    <div class="footer">
+      <p>© 2025 S7 Robotics. Все права защищены.</p>
     </div>
   </div>
 </body>

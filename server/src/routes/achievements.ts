@@ -5,7 +5,7 @@ import type { AuthenticatedRequest } from "../types"
 
 export const router = Router()
 
-router.get("/mine", requireAuth, async (req, res) => {
+router.get("/mine", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const list = await prisma.userAchievement.findMany({
     where: { userId: req.user!.id },
     orderBy: { earnedAt: "desc" },
