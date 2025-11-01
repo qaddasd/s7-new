@@ -91,48 +91,76 @@ export default function CreateKruzhok({ onKruzhokCreated }: CreateKruzhokProps) 
   };
 
   return (
-    <CustomDialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className=\"bg-green-500 text-white hover:bg-green-600\">Создать кружок</Button>
-      </DialogTrigger>
-      <DialogContent className=\"sm:max-w-[425px] bg-[#16161c] border-[#636370]/20 text-white\">
-        <DialogHeader>
-          <DialogTitle>Создать новый кружок</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className=\"space-y-4\">
-          <div className="space-y-2">
-            <Label htmlFor="name">Название кружка</Label>
-            <Input id="name" placeholder="Название кружка" value={name} onChange={(e) => setName(e.target.value)} required className="bg-[#1e1e26] border-[#636370]/20 text-white" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Описание кружка</Label>
-            <Textarea id="description" placeholder="Описание кружка" value={description} onChange={(e) => setDescription(e.target.value)} className="bg-[#1e1e26] border-[#636370]/20 text-white" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="program">Программа (Методика)</Label>
-            <Select value={selectedProgramId} onValueChange={setSelectedProgramId} disabled={isFetchingPrograms || programs.length === 0}>
-              <SelectTrigger id="program" className="bg-[#1e1e26] border-[#636370]/20 text-white">
-                <SelectValue placeholder={isFetchingPrograms ? "Загрузка программ..." : "Выберите программу"} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#1e1e26] border-[#636370]/20 text-white">
-                {programs.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {programs.length === 0 && !isFetchingPrograms && (
-              <p className="text-sm text-red-400">Нет доступных программ. Обратитесь к администратору.</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label>Расписание</Label>
-            <ScheduleInput schedule={schedule} onChange={setSchedule} />
-          </div>
-          <Button type="submit" disabled={isSubmitting || programs.length === 0 || schedule.length === 0} className="w-full bg-[#00a3ff] text-black hover:bg-[#0088cc]">
-            {isSubmitting ? 'Создание...' : 'Создать'}
-          </Button>
-        </form>
-      </DialogContent>
-    </CustomDialog>
-  );
+  <CustomDialog open={isOpen} onOpenChange={setIsOpen}>
+    <DialogTrigger asChild>
+      <Button className="bg-green-500 text-white hover:bg-green-600">Создать кружок</Button>
+    </DialogTrigger>
+    <DialogContent className="sm:max-w-[425px] bg-[#16161c] border-[#636370]/20 text-white">
+      <DialogHeader>
+        <DialogTitle>Создать новый кружок</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Название кружка</Label>
+          <Input
+            id="name"
+            placeholder="Название кружка"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            className="bg-[#1e1e26] border-[#636370]/20 text-white"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Описание кружка</Label>
+          <Textarea
+            id="description"
+            placeholder="Описание кружка"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="bg-[#1e1e26] border-[#636370]/20 text-white"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="program">Программа (Методика)</Label>
+          <Select
+            value={selectedProgramId}
+            onValueChange={setSelectedProgramId}
+            disabled={isFetchingPrograms || programs.length === 0}
+          >
+            <SelectTrigger id="program" className="bg-[#1e1e26] border-[#636370]/20 text-white">
+              <SelectValue placeholder={isFetchingPrograms ? "Загрузка программ..." : "Выберите программу"} />
+            </SelectTrigger>
+            <SelectContent className="bg-[#1e1e26] border-[#636370]/20 text-white">
+              {programs.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {programs.length === 0 && !isFetchingPrograms && (
+            <p className="text-sm text-red-400">Нет доступных программ. Обратитесь к администратору.</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Расписание</Label>
+          <ScheduleInput schedule={schedule} onChange={setSchedule} />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={isSubmitting || programs.length === 0 || schedule.length === 0}
+          className="w-full bg-[#00a3ff] text-black hover:bg-[#0088cc]"
+        >
+          {isSubmitting ? "Создание..." : "Создать"}
+        </Button>
+      </form>
+    </DialogContent>
+  </CustomDialog>
+);
+
 }
