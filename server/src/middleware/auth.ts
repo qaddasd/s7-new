@@ -36,3 +36,4 @@ export function optionalAuth(req: AuthenticatedRequest, _res: Response, next: Ne
 
 // Backward-compatible alias used by some routers
 export const requireAuth = protect
+export { isAdmin as requireAdmin }

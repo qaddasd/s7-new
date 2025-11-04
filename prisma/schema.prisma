@@ -113,6 +113,8 @@ model User {
   kruzhoksOwned      Kruzhok[]         @relation(name: "KruzhokOwner")
   kruzhokSubscriptions KruzhokSubscription[]
   kruzhokLessonProgress KruzhokLessonProgress[]
+  // Opposite side for KruzhokAttendance.markedBy
+  kruzhokAttendanceMarked KruzhokAttendance[]
 }
 
 model Session {
@@ -623,6 +625,9 @@ model Kruzhok {
 
   lessons     KruzhokLesson[]
   subscriptions KruzhokSubscription[]
+  // Opposite relations for attendance module
+  extraStudents KruzhokExtraStudent[]
+  sessions      KruzhokSession[]
 }
 
 model KruzhokProgram {

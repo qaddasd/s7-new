@@ -370,29 +370,38 @@ export default function LoginPage() {
               </div>
             )}
           </div>
+        {isLogin && !isForgot && (
+          <Button
+            onClick={handleLogin}
+            className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full mt-6 transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up"
+            style={{ animationDelay: "900ms" }}
+          >
+            Войти
+          </Button>
+        )}
+        {!isLogin && (
+          <Button
+            onClick={handleRegister}
+            className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full mt-6 transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up"
+            style={{ animationDelay: "900ms" }}
+          >
+            Зарегистрироваться
+          </Button>
+        )}
+        {isLogin && (
+          <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
+            <button
+              onClick={() => { setIsForgot((v) => !v); if (!isForgot) { setForgotSent(false); setResetCode(""); setNewPwd(""); setNewPwd2("") } }}
+              className={`text-[#a7a7a7] text-sm transition-all duration-300 hover:text-white ${isForgot ? 'text-white' : ''}`}
+            >
+              {isForgot ? "Вернуться к входу" : "Забыли пароль?"}
+            </button>
+          </div>
+        )}
         </div>
       </div>
 
-      {!isForgot && (
-        <Button
-          onClick={isLogin ? handleLogin : handleRegister}
-          className={`w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full ${isLogin ? "mt-8" : "mt-8"} transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up`}
-          style={{ animationDelay: "900ms" }}
-        >
-          {isLogin ? "Войти" : "Зарегистрироваться"}
-        </Button>
-      )}
-
-      {isLogin && (
-        <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
-          <button
-            onClick={() => { setIsForgot((v) => !v); if (!isForgot) { setForgotSent(false); setResetCode(""); setNewPwd(""); setNewPwd2("") } }}
-            className={`text-[#a7a7a7] text-sm transition-all duration-300 hover:text-white ${isForgot ? 'text-white' : ''}`}
-          >
-            {isForgot ? "Вернуться к входу" : "Забыли пароль?"}
-          </button>
-        </div>
-      )}
+      
 
       <div className="text-center mt-6 animate-slide-up" style={{ animationDelay: "1000ms" }}>
         <button
