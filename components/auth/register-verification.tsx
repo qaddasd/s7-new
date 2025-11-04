@@ -31,18 +31,19 @@ export function RegisterVerification({ email, onVerified, onBack }: RegisterVeri
 
     setLoading(true)
     try {
-      const data = await apiFetch<any>("/auth/verify-email", {
+      // Use login-verify so we both verify email and get tokens to sign in immediately
+      const data = await apiFetch<any>("/auth/login-verify", {
         method: "POST",
         body: JSON.stringify({ email, code })
       })
       
-      if (data.error) {
-        throw new Error(data.error)
+      if ((data as any).error) {
+        throw new Error((data as any).error)
       }
       
       toast({ 
         title: "Успешно", 
-        description: "Регистрация завершена успешно!" 
+        description: "Вы успешно вошли в систему" 
       })
       
       onVerified(data)

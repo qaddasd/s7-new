@@ -1,4 +1,4 @@
-﻿import { Router, type Request, type Response } from "express"
+import { Router, type Request, type Response } from "express"
 import { z } from "zod"
 import { prisma } from "../db"
 import { hashPassword, verifyPassword } from "../utils/password"
@@ -613,6 +613,9 @@ router.get("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) 
     role: user.role,
     fullName: user.fullName,
     xp: Number((user as any).experiencePoints || 0),
+    educationalInstitution: (user as any).educationalInstitution,
+    primaryRole: (user as any).primaryRole,
+    age: typeof (user as any).age === 'number' ? (user as any).age : undefined,
     profile: user.profile,
   })
 })
@@ -638,7 +641,7 @@ router.put("/me", requireAuth, async (req: AuthenticatedRequest, res: Response) 
         educationalInstitution: data.educationalInstitution,
         primaryRole: data.primaryRole,
       },
-      select: { id: true, email: true, role: true, fullName: true },
+      select: { id: true, email: true, role: true, fullName: true, educationalInstitution: true, primaryRole: true, age: true },
     })
     return res.json(updated)
   } catch (e) {

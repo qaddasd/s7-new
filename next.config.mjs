@@ -1,4 +1,4 @@
-﻿
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -8,6 +8,17 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+  },
+  async rewrites() {
+    // Dev proxy to Express backend on :4000 so client-side apiFetch('/api/...') works locally
+    const target = process.env.API_DEV_TARGET || 'http://localhost:4000'
+    return [
+      { source: '/api/:path*', destination: `${target}/api/:path*` },
+      { source: '/auth/:path*', destination: `${target}/auth/:path*` },
+      { source: '/courses/:path*', destination: `${target}/courses/:path*` },
+      { source: '/uploads/:path*', destination: `${target}/uploads/:path*` },
+      { source: '/media/:path*', destination: `${target}/media/:path*` },
+    ]
   },
 }
 

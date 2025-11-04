@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { body, param, query } from "express-validator";
-import { validate } from "../middleware/validate.js";
-import { requireAuth } from "../middleware/auth.js";
+import { validate } from "../middleware/validate";
+import { protect } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -13,7 +13,7 @@ const router = Router();
 // GET /api/kruzhok/:kruzhokId/lessons - Кружоктың барлық сабақтары
 router.get(
   "/kruzhok/:kruzhokId/lessons",
-  requireAuth,
+  protect,
   [param("kruzhokId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {
@@ -86,7 +86,7 @@ router.get(
 // GET /api/kruzhok/:kruzhokId/lessons/:lessonId - Сабақтың толық ақпараты
 router.get(
   "/kruzhok/:kruzhokId/lessons/:lessonId",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),
@@ -163,7 +163,7 @@ router.get(
 // POST /api/kruzhok/:kruzhokId/lessons - Жаңа сабақ құру (тек иесі/админ)
 router.post(
   "/kruzhok/:kruzhokId/lessons",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     body("title").isString().trim().notEmpty().withMessage("Title is required"),
@@ -245,7 +245,7 @@ router.post(
 // PUT /api/kruzhok/:kruzhokId/lessons/:lessonId - Сабақты жаңарту
 router.put(
   "/kruzhok/:kruzhokId/lessons/:lessonId",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),
@@ -300,7 +300,7 @@ router.put(
 // DELETE /api/kruzhok/:kruzhokId/lessons/:lessonId - Сабақты жою
 router.delete(
   "/kruzhok/:kruzhokId/lessons/:lessonId",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),
@@ -342,7 +342,7 @@ router.delete(
 // POST /api/kruzhok/:kruzhokId/lessons/:lessonId/complete - Сабақты аяқтау
 router.post(
   "/kruzhok/:kruzhokId/lessons/:lessonId/complete",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),

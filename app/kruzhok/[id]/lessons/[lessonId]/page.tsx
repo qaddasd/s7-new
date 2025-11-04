@@ -17,56 +17,25 @@ import {
   GamepadIcon,
   CheckCircle,
   QrCode,
+  MessageCircle,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 
 interface Lesson {
   id: string
   title: string
-  description?: string
-  type: string
-  content?: string
-  videoUrl?: string
-  presentationUrl?: string
-  showAccessCode: boolean
-  kruzhok: {
-    id: string
-    name: string
-    accessCode?: string
+  lessonTemplate: {
+    mediaType: string
+    contentUrl: string | null
+    scenarioText: string | null
+    quizId: string | null
   }
-  quizzes: Array<{
-    id: string
-    title: string
-    description?: string
-    timeLimit?: number
-    showAnswersImmediately: boolean
-    randomizeQuestions: boolean
-    randomizeOptions: boolean
-    pointsPerQuestion: number
-    timeBonus: boolean
-    questions: Array<{
-      id: string
-      questionText: string
-      type: string
-      options: any[]
-      imageUrl?: string
-      explanation?: string
-      points: number
-      timeLimit?: number
-      orderIndex: number
-    }>
-  }>
-  matchingGames: Array<{
-    id: string
-    title: string
-    description?: string
-    difficulty: string
-    timeLimit?: number
-    showHints: boolean
-    pointsPerMatch: number
-    penaltyPerMistake: number
-    pairs: any[]
-  }>
+  isMentor: boolean // To show the 'End Lesson' button
+  content?: string // For ReactMarkdown
+  showAccessCode?: boolean // For access code
+  kruzhok?: { accessCode?: string } // For access code
+  quizzes?: any[] // For QuizPlayer
+  matchingGames?: any[] // For MatchingGame
 }
 
 export default function LessonViewPage() {
@@ -76,11 +45,15 @@ export default function LessonViewPage() {
   const lessonId = params.lessonId as string
 
   const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [isEndingLesson, setIsEndingLesson] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeQuizIndex, setActiveQuizIndex] = useState<number | null>(null)
   const [activeGameIndex, setActiveGameIndex] = useState<number | null>(null)
   const [quizResults, setQuizResults] = useState<Map<string, any>>(new Map())
   const [gameResults, setGameResults] = useState<Map<string, any>>(new Map())
+
+  const now = new Date()
+  const ruDate = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "long", year: "numeric" }).format(now)
 
   useEffect(() => {
     fetchLesson()
@@ -96,7 +69,7 @@ export default function LessonViewPage() {
       toast({
         title: "Қате",
         description: "Сабақты жүктеу мүмкін болмады",
-        variant: "destructive",
+        variant: "destructive" as any,
       })
     } finally {
       setLoading(false)
@@ -119,6 +92,31 @@ export default function LessonViewPage() {
       })
     } catch (error) {
       console.error("Failed to save progress:", error)
+    }
+  }
+
+  const handleEndLesson = async () => {
+    if (!lesson?.isMentor) return
+
+    setIsEndingLesson(true)
+    try {
+      await apiFetch(`/api/kruzhok/${kruzhokId}/lessons/${lessonId}/end`, {
+        method: "POST",
+      })
+      toast({
+        title: "Сабақ аяқталды",
+        description: "Оқушыларға квиз туралы хабарлама жіберілді.",
+      })
+      // Optionally refresh the lesson data to reflect the new state
+      fetchLesson()
+    } catch (error: any) {
+      toast({
+        title: "Қате",
+        description: error.message || "Сабақты аяқтау мүмкін болмады",
+        variant: "destructive" as any,
+      })
+    } finally {
+      setIsEndingLesson(false)
     }
   }
 
@@ -168,52 +166,104 @@ export default function LessonViewPage() {
   }
 
   // Квиз ойнау режимі
-  if (activeQuizIndex !== null) {
+  if (activeQuizIndex !== null && lesson.quizzes) {
     return (
       <QuizPlayer
         quiz={lesson.quizzes[activeQuizIndex]}
-        onComplete={(result) => handleQuizComplete(lesson.quizzes[activeQuizIndex].id, result)}
+        onComplete={(result) => handleQuizComplete(lesson.quizzes![activeQuizIndex].id, result)}
       />
     )
   }
 
   // Сәйкестендіру ойыны режимі
-  if (activeGameIndex !== null) {
+  if (activeGameIndex !== null && lesson.matchingGames) {
     return (
       <MatchingGame
         game={lesson.matchingGames[activeGameIndex]}
-        onComplete={(result) => handleGameComplete(lesson.matchingGames[activeGameIndex].id, result)}
+        onComplete={(result) => handleGameComplete(lesson.matchingGames![activeGameIndex].id, result)}
       />
     )
   }
 
   return (
     <div className="container mx-auto p-6">
-      {/* Үстіңгі панель */}
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Сабақтарға оралу
-        </Button>
-        {lesson.showAccessCode && lesson.kruzhok.accessCode && (
-          <div className="flex items-center gap-2">
-            <QrCode className="w-5 h-5 text-gray-400" />
-            <Badge className="text-lg py-2 px-4 font-mono">{lesson.kruzhok.accessCode}</Badge>
-          </div>
-        )}
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <div className="text-3xl font-bold text-white mb-1">Панель управление</div>
+          <div className="text-white/60">Класс 1 / {lesson.title}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-3xl font-bold text-white">{ruDate.split(" ")[0]} {ruDate.split(" ")[1]}</div>
+          <div className="text-white/50">{ruDate.split(" ")[2]}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div className="space-y-3">
+          <button className="w-full rounded-full h-12 bg-[#16161c] border border-[#2a2a35] text-white px-5 flex items-center gap-3">
+            <Presentation className="w-5 h-5 text-white/70" />
+            <span>Слайд. {lesson.title}</span>
+          </button>
+          <button className="w-full rounded-full h-12 bg-[#16161c] border border-[#2a2a35] text-white px-5 flex items-center gap-3">
+            <FileText className="w-5 h-5 text-white/70" />
+            <span>Журнал посещаемости</span>
+          </button>
+          <button className="w-full rounded-full h-12 bg-[#16161c] border border-[#2a2a35] text-white px-5 flex items-center gap-3">
+            <MessageCircle className="w-5 h-5 text-white/70" />
+            <span>Комментарий ментора</span>
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                await apiFetch(`/api/kruzhok/${kruzhokId}/lessons/${lessonId}/complete`, { method: "POST" })
+                toast({ title: "Сабақ сақталды" })
+              } catch (e: any) {
+                toast({ title: "Қате", description: e?.message || "Сақтау мүмкін болмады", variant: "destructive" as any })
+              }
+            }}
+            className="w-full rounded-full h-12 bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold"
+          >
+            сабмит
+          </button>
+        </div>
+        <div className="flex items-start justify-end gap-3">
+          {lesson.isMentor && (
+            <Button onClick={handleEndLesson} disabled={isEndingLesson} className="bg-[#22c55e] text-black hover:bg-[#16a34a]">
+              {isEndingLesson ? "Аяқталуда..." : "Сабақты аяқтау (Квиз жіберу)"}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Назад
+          </Button>
+          {lesson.showAccessCode && lesson.kruzhok?.accessCode && (
+            <div className="flex items-center gap-2">
+              <QrCode className="w-5 h-5 text-gray-400" />
+              <Badge className="text-lg py-2 px-4 font-mono">{lesson.kruzhok.accessCode}</Badge>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Тақырып */}
       <div className="mb-6">
         <h1 className="text-4xl font-bold mb-2">{lesson.title}</h1>
-        {lesson.description && <p className="text-gray-600 text-lg">{lesson.description}</p>}
+        {lesson.lessonTemplate.scenarioText && (
+          <Card className="mt-4 bg-[#16161c] border-[#636370]/20 text-white">
+            <CardHeader>
+              <CardTitle className="text-white">Сценарий / Әдістеме</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-lg max-w-none text-white/80">
+                <ReactMarkdown>{lesson.lessonTemplate.scenarioText}</ReactMarkdown>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <div className="flex gap-2 mt-4">
-          <Badge variant="outline">{lesson.type}</Badge>
-          {lesson.quizzes.length > 0 && (
-            <Badge className="bg-purple-500">{lesson.quizzes.length} квиз</Badge>
-          )}
-          {lesson.matchingGames.length > 0 && (
-            <Badge className="bg-orange-500">{lesson.matchingGames.length} ойын</Badge>
+          <Badge variant="outline">{lesson.lessonTemplate.mediaType}</Badge>
+          {lesson.lessonTemplate.quizId && (
+            <Badge className="bg-purple-500">Квиз</Badge>
           )}
         </div>
       </div>
@@ -224,34 +274,28 @@ export default function LessonViewPage() {
             <FileText className="w-4 h-4 mr-2" />
             Мазмұн
           </TabsTrigger>
-          {lesson.quizzes.length > 0 && (
+          {lesson.lessonTemplate.quizId && (
             <TabsTrigger value="quizzes">
               <GamepadIcon className="w-4 h-4 mr-2" />
-              Квиздер ({lesson.quizzes.length})
-            </TabsTrigger>
-          )}
-          {lesson.matchingGames.length > 0 && (
-            <TabsTrigger value="games">
-              <GamepadIcon className="w-4 h-4 mr-2" />
-              Сәйкестендіру ({lesson.matchingGames.length})
+              Квиз
             </TabsTrigger>
           )}
         </TabsList>
 
         <TabsContent value="content" className="space-y-6">
-          {/* Видео */}
-          {lesson.videoUrl && (
+          {/* Медиа материал */}
+          {lesson.lessonTemplate.contentUrl && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Video className="w-5 h-5" />
-                  Видео
+                  {lesson.lessonTemplate.mediaType === "video" ? <Video className="w-5 h-5" /> : <Presentation className="w-5 h-5" />}
+                  {lesson.lessonTemplate.mediaType === "video" ? "Видео" : "Презентация"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="aspect-video">
                   <iframe
-                    src={getEmbedUrl(lesson.videoUrl)}
+                    src={getEmbedUrl(lesson.lessonTemplate.contentUrl)}
                     className="w-full h-full rounded-lg"
                     allowFullScreen
                   />
@@ -260,29 +304,8 @@ export default function LessonViewPage() {
             </Card>
           )}
 
-          {/* Презентация */}
-          {lesson.presentationUrl && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Presentation className="w-5 h-5" />
-                  Презентация
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="aspect-video">
-                  <iframe
-                    src={getEmbedUrl(lesson.presentationUrl)}
-                    className="w-full h-full rounded-lg"
-                    allowFullScreen
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Текст */}
-          {lesson.content && (
+          {/* Ресурс/Текст */}
+          {lesson.lessonTemplate.mediaType === "resource" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -292,7 +315,7 @@ export default function LessonViewPage() {
               </CardHeader>
               <CardContent>
                 <div className="prose prose-lg max-w-none">
-                  <ReactMarkdown>{lesson.content}</ReactMarkdown>
+                  <ReactMarkdown>{lesson.content || "Қосымша материал жоқ"}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
@@ -300,109 +323,21 @@ export default function LessonViewPage() {
         </TabsContent>
 
         <TabsContent value="quizzes" className="space-y-4">
-          {lesson.quizzes.map((quiz, index) => {
-            const result = quizResults.get(quiz.id)
-
-            return (
-              <Card key={quiz.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{quiz.title}</CardTitle>
-                      {quiz.description && <p className="text-gray-600 mt-2">{quiz.description}</p>}
-                      <div className="flex gap-2 mt-3">
-                        <Badge variant="outline">{quiz.questions.length} сұрақ</Badge>
-                        {quiz.timeLimit && quiz.timeLimit > 0 && (
-                          <Badge variant="outline">{quiz.timeLimit}s уақыт</Badge>
-                        )}
-                        {result && <Badge className="bg-green-500">Аяқталды</Badge>}
-                      </div>
-                    </div>
-                    <Button onClick={() => setActiveQuizIndex(index)}>
-                      {result ? "Қайта өту" : "Бастау"}
-                    </Button>
+          {lesson.lessonTemplate.quizId && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>Квиз</CardTitle>
+                    <p className="text-gray-600 mt-2">Сабақ бойынша білімді тексеруге арналған квиз.</p>
                   </div>
-                </CardHeader>
-                {result && (
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">{result.correctAnswers}</p>
-                        <p className="text-sm text-gray-600">Дұрыс</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-blue-600">{result.score}</p>
-                        <p className="text-sm text-gray-600">Ұпай</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-gray-600">{Math.round(result.timeSpent)}s</p>
-                        <p className="text-sm text-gray-600">Уақыт</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            )
-          })}
-        </TabsContent>
-
-        <TabsContent value="games" className="space-y-4">
-          {lesson.matchingGames.map((game, index) => {
-            const result = gameResults.get(game.id)
-
-            return (
-              <Card key={game.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{game.title}</CardTitle>
-                      {game.description && <p className="text-gray-600 mt-2">{game.description}</p>}
-                      <div className="flex gap-2 mt-3">
-                        <Badge variant="outline">{game.pairs.length} жұп</Badge>
-                        <Badge
-                          className={
-                            game.difficulty === "EASY"
-                              ? "bg-green-500"
-                              : game.difficulty === "MEDIUM"
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                          }
-                        >
-                          {game.difficulty === "EASY"
-                            ? "Оңай"
-                            : game.difficulty === "MEDIUM"
-                            ? "Орташа"
-                            : "Қиын"}
-                        </Badge>
-                        {result && <Badge className="bg-green-500">Аяқталды</Badge>}
-                      </div>
-                    </div>
-                    <Button onClick={() => setActiveGameIndex(index)}>
-                      {result ? "Қайта ойнау" : "Бастау"}
-                    </Button>
-                  </div>
-                </CardHeader>
-                {result && (
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">{result.correctMatches}</p>
-                        <p className="text-sm text-gray-600">Дұрыс</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-red-600">{result.mistakes}</p>
-                        <p className="text-sm text-gray-600">Қателер</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-blue-600">{result.score}</p>
-                        <p className="text-sm text-gray-600">Ұпай</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            )
-          })}
+                  <Button onClick={() => router.push(`/quiz/${lesson.lessonTemplate.quizId}`)}>
+                    Бастау
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

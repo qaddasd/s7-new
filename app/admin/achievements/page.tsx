@@ -54,18 +54,18 @@ export default function AdminAchievementsPage() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      <h1 className="text-white text-2xl font-bold mb-6">Достижения участников</h1>
+      <h1 className="text-white text-2xl font-bold mb-6">Қатысушылардың жетістіктері</h1>
 
       {/* Issuance UI removed. To re-enable granting achievements from admin, restore a safe explicit flow here. */}
 
       {/* User Achievements */}
       <section className="mb-10">
-        <h2 className="text-white text-lg font-semibold mb-3">Значки и награды</h2>
+        <h2 className="text-white text-lg font-semibold mb-3">Белгілер мен марапаттар</h2>
         <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4">
           {loading ? (
-            <div className="text-white/70">Загрузка...</div>
+            <div className="text-white/70">Жүктелуде...</div>
           ) : rows.length === 0 ? (
-            <div className="text-white/60">Нет данных</div>
+            <div className="text-white/60">Деректер жоқ</div>
           ) : (
             <div className="divide-y divide-[#2a2a35]">
               {rows.map((r) => (
@@ -83,7 +83,7 @@ export default function AdminAchievementsPage() {
                     <div className="text-white/50 text-xs">{new Date(r.earnedAt).toLocaleString("ru-RU")}</div>
                     <Button
                       onClick={async ()=>{
-                        const ok = await confirm({ title: 'Отозвать награду?', description: 'Действие необратимо. Пользователь потеряет эту награду.', confirmText: 'Отозвать', cancelText: 'Отмена', variant: 'danger' })
+                        const ok = await confirm({ title: 'Марапатты кері қайтару?', description: 'Әрекет қайтарылмайды. Қолданушы бұл марапаттан айырылады.', confirmText: 'Кері қайтару', cancelText: 'Бас тарту', variant: 'danger' })
                         if (!ok) return
                         try {
                           await apiFetch(`/api/admin/user-achievements/${r.id}`, { method: 'DELETE' })
@@ -94,7 +94,7 @@ export default function AdminAchievementsPage() {
                       }}
                       className="bg-[#ef4444] hover:bg-[#dc2626] text-white h-8 px-3"
                     >
-                      Отозвать
+                      Кері қайтару
                     </Button>
                   </div>
                 </div>
@@ -106,12 +106,12 @@ export default function AdminAchievementsPage() {
 
       {/* Competition Winners */}
       <section>
-        <h2 className="text-white text-lg font-semibold mb-3">Победители соревнований</h2>
+        <h2 className="text-white text-lg font-semibold mb-3">Жарыс жеңімпаздары</h2>
         <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4">
           {loading ? (
-            <div className="text-white/70">Загрузка...</div>
+            <div className="text-white/70">Жүктелуде...</div>
           ) : winners.length === 0 ? (
-            <div className="text-white/60">Нет победителей</div>
+            <div className="text-white/60">Жеңімпаздар жоқ</div>
           ) : (
             <div className="divide-y divide-[#2a2a35]">
               {winners.map((w) => (
@@ -122,7 +122,7 @@ export default function AdminAchievementsPage() {
                     </div>
                     <div>
                       <div className="text-white font-medium">{w.user.fullName || w.user.email}</div>
-                      <div className="text-white/60 text-sm">{w.title} — {w.placement || "место"}</div>
+                      <div className="text-white/60 text-sm">{w.title} — {w.placement || "орын"}</div>
                     </div>
                   </div>
                   <div className="text-white/50 text-xs">{w.eventDate ? new Date(w.eventDate).toLocaleDateString("ru-RU") : ""}</div>

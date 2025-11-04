@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -110,6 +110,9 @@ model User {
   attendanceMarker   Attendance[]      @relation("AttendanceMarker")
   assignmentSubmissions AssignmentSubmission[]
   newsArticles       News[]            @relation("NewsAuthor")
+  kruzhoksOwned      Kruzhok[]         @relation(name: "KruzhokOwner")
+  kruzhokSubscriptions KruzhokSubscription[]
+  kruzhokLessonProgress KruzhokLessonProgress[]
 }
 
 model Session {
@@ -600,4 +603,128 @@ model NewsAttachment {
   description String?
   orderIndex Int     @default(0)
   createdAt DateTime @default(now())
+}
+
+// --- Kruzhok Module Models ---
+
+model Kruzhok {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  ownerId     String
+  owner       User     @relation("KruzhokOwner", fields: [ownerId], references: [id])
+  programId   String?
+  program     KruzhokProgram? @relation(fields: [programId], references: [id])
+  isActive    Boolean  @default(true)
+  isFree      Boolean  @default(false)
+  price       Decimal  @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons     KruzhokLesson[]
+  subscriptions KruzhokSubscription[]
+}
+
+model KruzhokProgram {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  kruzhoks    Kruzhok[]
+  lessons     KruzhokLessonTemplate[]
+}
+
+model KruzhokLessonTemplate {
+  id          String   @id @default(cuid())
+  programId   String
+  program     KruzhokProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title       String
+  content     String?
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model KruzhokLesson {
+  id          String   @id @default(cuid())
+  kruzhokId   String
+  kruzhok     Kruzhok  @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  title       String
+  content     String?
+  orderIndex  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress    KruzhokLessonProgress[]
+}
+
+model KruzhokSubscription {
+  id          String   @id @default(cuid())
+  kruzhokId   String
+  kruzhok     Kruzhok  @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  status      String   @default("active") // active, expired, cancelled
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([kruzhokId, userId])
+}
+
+model KruzhokLessonProgress {
+  id          String   @id @default(cuid())
+  lessonId    String
+  lesson      KruzhokLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([lessonId, userId])
+}
+
+// --- Kruzhok Attendance Models ---
+// Mentors can add students by full name and add any dates; attendance is stored per session date.
+model KruzhokExtraStudent {
+  id         String   @id @default(cuid())
+  kruzhok    Kruzhok  @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  kruzhokId  String
+  fullName   String
+  createdAt  DateTime @default(now())
+
+  attendances KruzhokAttendance[]
+}
+
+model KruzhokSession {
+  id         String   @id @default(cuid())
+  kruzhok    Kruzhok  @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  kruzhokId  String
+  date       DateTime
+  topic      String?
+  endAt      DateTime?
+  createdAt  DateTime @default(now())
+
+  attendances KruzhokAttendance[]
+
+  @@unique([kruzhokId, date])
+}
+
+model KruzhokAttendance {
+  id             String   @id @default(cuid())
+  session        KruzhokSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId      String
+  extraStudent   KruzhokExtraStudent @relation(fields: [extraStudentId], references: [id], onDelete: Cascade)
+  extraStudentId String
+  present        Boolean  @default(true)
+  markedBy       User?    @relation(fields: [markedById], references: [id], onDelete: SetNull)
+  markedById     String?
+  markedAt       DateTime @default(now())
+
+  @@unique([sessionId, extraStudentId])
 }

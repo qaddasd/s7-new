@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { body, param } from "express-validator";
 import { validate } from "../middleware/validate.js";
-import { requireAuth } from "../middleware/auth.js";
+import { protect } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -13,7 +13,7 @@ const router = Router();
 // POST /api/kruzhok/:kruzhokId/lessons/:lessonId/matching - Сәйкестендіру ойынын құру
 router.post(
   "/kruzhok/:kruzhokId/lessons/:lessonId/matching",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),
@@ -65,7 +65,7 @@ router.post(
 // POST /api/kruzhok/matching/:gameId/pairs - Жұп қосу
 router.post(
   "/kruzhok/matching/:gameId/pairs",
-  requireAuth,
+  protect,
   [
     param("gameId").isString().trim().notEmpty(),
     body("leftItem").isString().trim().notEmpty(),
@@ -97,7 +97,7 @@ router.post(
 // GET /api/kruzhok/matching/:gameId - Ойынды алу
 router.get(
   "/kruzhok/matching/:gameId",
-  requireAuth,
+  protect,
   [param("gameId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {
@@ -128,7 +128,7 @@ router.get(
 // POST /api/kruzhok/matching/:gameId/attempt - Ойынды бастау
 router.post(
   "/kruzhok/matching/:gameId/attempt",
-  requireAuth,
+  protect,
   [param("gameId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {
@@ -181,7 +181,7 @@ router.post(
 // POST /api/kruzhok/matching/attempt/:attemptId/submit - Жауапты жіберу
 router.post(
   "/kruzhok/matching/attempt/:attemptId/submit",
-  requireAuth,
+  protect,
   [
     param("attemptId").isString().trim().notEmpty(),
     body("answers").isArray().withMessage("Answers must be an array"),
@@ -266,7 +266,7 @@ router.post(
 // GET /api/kruzhok/matching/:gameId/leaderboard - Рейтинг кестесі
 router.get(
   "/kruzhok/matching/:gameId/leaderboard",
-  requireAuth,
+  protect,
   [param("gameId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {

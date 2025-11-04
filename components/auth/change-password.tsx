@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/hooks/use-toast"
+import { apiFetch } from "@/lib/api"
 
 interface ChangePasswordProps {
   onSuccess: () => void
@@ -45,38 +46,17 @@ export function ChangePassword({ onSuccess }: ChangePasswordProps) {
 
     setLoading(true)
     try {
-      const response = await fetch("/api/auth/change-password", {
+      await apiFetch("/auth/change-password", {
         method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "authorization": `Bearer ${localStorage.getItem("accessToken")}`
-        },
         body: JSON.stringify({ currentPassword, newPassword })
       })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Ошибка изменения пароля")
-      }
-      
-      toast({ 
-        title: "Успешно", 
-        description: "Пароль успешно изменен" 
-      })
-      
-      // Clear form
+      toast({ title: "Успешно", description: "Пароль успешно изменен" })
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
-      
       onSuccess()
     } catch (e: any) {
-      toast({ 
-        title: "Ошибка", 
-        description: e?.message || "Не удалось изменить пароль", 
-        variant: "destructive" as any 
-      })
+      toast({ title: "Ошибка", description: e?.message || "Не удалось изменить пароль", variant: "destructive" as any })
     } finally {
       setLoading(false)
     }

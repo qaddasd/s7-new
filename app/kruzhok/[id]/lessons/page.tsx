@@ -21,18 +21,23 @@ import {
 interface Lesson {
   id: string
   title: string
-  description?: string
-  type: string
   orderIndex: number
-  isPublished: boolean
-  isFree: boolean
-  showAccessCode: boolean
+  // New fields based on the new logic
+  lessonTemplateId: string
+  lessonTemplate: {
+    mediaType: string
+    contentUrl: string | null
+    scenarioText: string | null
+    quizId: string | null
+  }
+  // Existing fields
   progress?: {
     isCompleted: boolean
     completedAt?: string
   }
-  quizzes: Array<{ id: string }>
-  matchingGames: Array<{ id: string }>
+  // New fields for scheduling
+  scheduledDate: string
+  isAvailable: boolean
 }
 
 interface Kruzhok {
@@ -64,7 +69,8 @@ export default function KruzhokLessonsPage() {
       setLoading(true)
       const [kruzhokData, lessonsData] = await Promise.all([
         apiFetch<Kruzhok>(`/api/kruzhok/${kruzhokId}`),
-        apiFetch<Lesson[]>(`/api/kruzhok/${kruzhokId}/lessons`),
+        // New API endpoint to fetch scheduled lessons
+        apiFetch<Lesson[]>(`/api/kruzhok/${kruzhokId}/scheduled-lessons`),
       ])
       setKruzhok(kruzhokData)
       setLessons(lessonsData || [])
@@ -90,15 +96,15 @@ export default function KruzhokLessonsPage() {
     }
   }
 
-  const getLessonIcon = (type: string) => {
-    switch (type) {
-      case "VIDEO":
+  const getLessonIcon = (mediaType: string) => {
+    switch (mediaType) {
+      case "video":
         return <PlayCircle className="w-6 h-6" />
-      case "PRESENTATION":
+      case "presentation":
+      case "slide":
         return <Presentation className="w-6 h-6" />
-      case "QUIZ":
-      case "MATCHING_GAME":
-        return <GamepadIcon className="w-6 h-6" />
+      case "resource":
+        return <FileText className="w-6 h-6" />
       default:
         return <FileText className="w-6 h-6" />
     }
@@ -180,7 +186,7 @@ export default function KruzhokLessonsPage() {
         <h2 className="text-2xl font-bold">Сабақтар</h2>
 
         {lessons.map((lesson, index) => {
-          const isLocked = !lesson.isPublished && !lesson.isFree
+	          const isLocked = !lesson.isAvailable
           const isCompleted = lesson.progress?.isCompleted
 
           return (
@@ -196,46 +202,37 @@ export default function KruzhokLessonsPage() {
                       className={`w-12 h-12 rounded-full flex items-center justify-center ${
                         isCompleted
                           ? "bg-green-100 text-green-600"
-                          : isLocked
-                          ? "bg-gray-100 text-gray-400"
-                          : "bg-blue-100 text-blue-600"
-                      }`}
-                    >
-                      {isCompleted ? <CheckCircle className="w-6 h-6" /> : isLocked ? <Lock className="w-6 h-6" /> : getLessonIcon(lesson.type)}
-                    </div>
+	                          : isLocked
+	                          ? "bg-gray-100 text-gray-400"
+	                          : "bg-blue-100 text-blue-600"
+	                      }`}
+	                    >
+	                      {isCompleted ? <CheckCircle className="w-6 h-6" /> : isLocked ? <Lock className="w-6 h-6" /> : getLessonIcon(lesson.lessonTemplate.mediaType)}
+	                    </div>
                   </div>
 
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-500">Сабақ {index + 1}</span>
-                          {lesson.isFree && <Badge variant="outline">Тегін preview</Badge>}
+	                          <span className="text-sm font-semibold text-gray-500">Сабақ {lesson.orderIndex}</span>
                           {isCompleted && <Badge className="bg-green-500">Аяқталды</Badge>}
                         </div>
                         <CardTitle className="mt-1">{lesson.title}</CardTitle>
                         {lesson.description && (
-                          <CardDescription className="mt-2">{lesson.description}</CardDescription>
+	                          <CardDescription className="mt-2">{lesson.lessonTemplate.scenarioText?.substring(0, 100)}...</CardDescription>
                         )}
                       </div>
 
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge variant="outline">{lesson.type}</Badge>
-                        {(lesson.quizzes.length > 0 || lesson.matchingGames.length > 0) && (
-                          <div className="flex gap-1">
-                            {lesson.quizzes.length > 0 && (
-                              <Badge className="bg-purple-500 text-xs">
-                                {lesson.quizzes.length} квиз
-                              </Badge>
-                            )}
-                            {lesson.matchingGames.length > 0 && (
-                              <Badge className="bg-orange-500 text-xs">
-                                {lesson.matchingGames.length} ойын
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </div>
+	                      <div className="flex flex-col items-end gap-2">
+	                        <Badge variant="outline">{lesson.lessonTemplate.mediaType}</Badge>
+	                        {lesson.lessonTemplate.quizId && (
+	                          <Badge className="bg-purple-500 text-xs">Квиз</Badge>
+	                        )}
+	                        <span className="text-xs text-gray-500">
+	                          {new Date(lesson.scheduledDate).toLocaleDateString("kk-KZ")}
+	                        </span>
+	                      </div>
                     </div>
 
                     {isCompleted && lesson.progress?.completedAt && (

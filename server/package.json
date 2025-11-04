@@ -7,22 +7,25 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsup src/index.ts --format esm --dts --out-dir dist",
     "start": "node dist/index.js",
-    "test-email": "tsx src/utils/test-email.ts"
+    "test-email": "tsx src/utils/test-email.ts",
+    "prisma:generate": "prisma generate --schema ../prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ../prisma/schema.prisma"
   },
   "dependencies": {
+    "@prisma/client": "^6.16.1",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^6.11.2",
+    "express-validator": "^7.3.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.13",
     "prisma": "^6.16.1",
-    "@prisma/client": "^6.16.1",
-    "zod": "^3.25.67",
-    "nodemailer": "^6.9.13"
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.7",
@@ -30,8 +33,8 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/multer": "^1.4.11",
     "@types/node": "^22",
-    "tsx": "^4.19.2",
     "tsup": "^8.2.4",
+    "tsx": "^4.19.2",
     "typescript": "^5.5.4"
   }
 }

@@ -1,12 +1,14 @@
 import { Router } from "express";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../types";
 import { prisma } from "../db.js";
 import { body, param, query } from "express-validator";
-import { validate } from "../middleware/validate.js";
-import { requireAdmin, requireAuth } from "../middleware/auth.js";
-import { UserRole } from "@prisma/client";
+import { validate } from "../middleware/validate";
+import { isAdmin, protect } from "../middleware/auth.js";
+// import { UserRole } from "@prisma/client";
 import crypto from "crypto";
 
-const router = Router();
+export const router = Router();
 
 // Helper function to generate a unique access code
 function generateAccessCode(): string {
@@ -15,10 +17,10 @@ function generateAccessCode(): string {
 
 // --- ADMIN ROUTES ---
 
-// POST /api/kruzhok - Create a new Kruzhok (requires subscription)
+// POST / - Create a new Kruzhok (mounted at /api/kruzhok, requires subscription)
 router.post(
-  "/api/kruzhok",
-  requireAuth,
+  "/",
+  protect,
   [
     body("name").isString().trim().notEmpty().withMessage("Kruzhok name is required"),
     body("description").optional().isString().trim(),
@@ -76,8 +78,8 @@ router.post(
 // POST /api/admin/kruzhok - Create a new Kruzhok (admin - no limits)
 router.post(
   "/admin/kruzhok",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     body("name").isString().trim().notEmpty().withMessage("Kruzhok name is required"),
     body("description").optional().isString().trim(),
@@ -132,8 +134,8 @@ router.post(
 // POST /api/admin/kruzhok/:id/confirm-payment - Confirm payment for paid club
 router.post(
   "/admin/kruzhok/:id/confirm-payment",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -176,8 +178,8 @@ router.post(
 // PUT /api/admin/kruzhok/:id - Update Kruzhok details
 router.put(
   "/admin/kruzhok/:id",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("name").optional().isString().trim().notEmpty(),
@@ -213,8 +215,8 @@ router.put(
 // DELETE /api/admin/kruzhok/:id - Delete a Kruzhok
 router.delete(
   "/admin/kruzhok/:id",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -235,8 +237,8 @@ router.delete(
 // GET /api/admin/kruzhok/:id/enrollment-requests - Get pending enrollment requests
 router.get(
   "/admin/kruzhok/:id/enrollment-requests",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -265,8 +267,8 @@ router.get(
 // POST /api/admin/kruzhok/:id/approve-enrollment/:memberId - Approve enrollment request
 router.post(
   "/admin/kruzhok/:id/approve-enrollment/:memberId",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     param("memberId").isString().trim().notEmpty().withMessage("Member ID is required"),
@@ -302,8 +304,8 @@ router.post(
 // POST /api/admin/kruzhok/:id/reject-enrollment/:memberId - Reject enrollment request
 router.post(
   "/admin/kruzhok/:id/reject-enrollment/:memberId",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     param("memberId").isString().trim().notEmpty().withMessage("Member ID is required"),
@@ -329,8 +331,8 @@ router.post(
 // POST /api/admin/kruzhok/:id/enroll - Enroll a user into the Kruzhok (direct admin enrollment)
 router.post(
   "/admin/kruzhok/:id/enroll",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("userId").isString().trim().notEmpty().withMessage("User ID is required"),
@@ -378,8 +380,8 @@ router.post(
 // DELETE /api/admin/kruzhok/:kruzhokId/unenroll/:userId - Unenroll a user
 router.delete(
   "/admin/kruzhok/:kruzhokId/unenroll/:userId",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("kruzhokId").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     param("userId").isString().trim().notEmpty().withMessage("User ID is required"),
@@ -408,8 +410,8 @@ router.delete(
 // GET /api/admin/kruzhok/:id/members - Get all members of a Kruzhok
 router.get(
   "/admin/kruzhok/:id/members",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -435,8 +437,8 @@ router.get(
 // POST /api/admin/kruzhok/:id/session - Create a new session for a Kruzhok
 router.post(
   "/admin/kruzhok/:id/session",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("sessionDate").isISO8601().toDate().withMessage("Valid session date is required"),
@@ -448,12 +450,10 @@ router.post(
     const { sessionDate, topic } = req.body;
 
     try {
-      const session = await prisma.kruzhokSession.create({
-        data: {
-          kruzhokId,
-          sessionDate,
-          topic,
-        },
+      const session = await (prisma as any).kruzhokSession.upsert({
+        where: { kruzhokId_date: { kruzhokId, date: sessionDate } },
+        update: { topic: topic ?? undefined },
+        create: { kruzhokId, date: sessionDate, topic },
       });
       res.status(201).json(session);
     } catch (error) {
@@ -466,17 +466,17 @@ router.post(
 // GET /api/admin/kruzhok/:id/sessions - Get all sessions for a Kruzhok
 router.get(
   "/admin/kruzhok/:id/sessions",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
     const { id: kruzhokId } = req.params;
 
     try {
-      const sessions = await prisma.kruzhokSession.findMany({
+      const sessions = await (prisma as any).kruzhokSession.findMany({
         where: { kruzhokId },
-        orderBy: { sessionDate: "desc" },
+        orderBy: { date: "desc" },
       });
       res.json(sessions);
     } catch (error) {
@@ -489,45 +489,29 @@ router.get(
 // POST /api/admin/session/:sessionId/attendance - Record attendance for a session
 router.post(
   "/admin/session/:sessionId/attendance",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("sessionId").isString().trim().notEmpty().withMessage("Session ID is required"),
     body().isArray().withMessage("Body must be an array of attendance records"),
-    body("*.memberId").isString().trim().notEmpty().withMessage("Member ID is required for each record"),
-    body("*.status").isIn(["present", "absent", "late", "excused"]).withMessage("Invalid attendance status"),
-    body("*.notes").optional().isString().trim(),
+    body("*.studentId").isString().trim().notEmpty().withMessage("Student ID is required for each record"),
+    body("*.present").isBoolean().withMessage("present must be boolean"),
   ],
   validate,
   async (req, res) => {
-    const { sessionId } = req.params;
-    const attendanceRecords = req.body;
+    const { sessionId } = req.params as any;
+    const attendanceRecords = req.body as any[];
 
     try {
-      const recordsToUpsert = attendanceRecords.map((record: any) => ({
-        where: {
-          sessionId_memberId: {
-            sessionId,
-            memberId: record.memberId,
-          },
-        },
-        update: {
-          status: record.status,
-          notes: record.notes,
-          recordedAt: new Date(),
-        },
-        create: {
-          sessionId,
-          memberId: record.memberId,
-          status: record.status,
-          notes: record.notes,
-        },
-      }));
-
       const results = await prisma.$transaction(
-        recordsToUpsert.map((record) => prisma.attendanceRecord.upsert(record))
+        attendanceRecords.map((record: any) =>
+          (prisma as any).kruzhokAttendance.upsert({
+            where: { sessionId_extraStudentId: { sessionId, extraStudentId: record.studentId } },
+            update: { present: Boolean(record.present), markedAt: new Date() },
+            create: { sessionId, extraStudentId: record.studentId, present: Boolean(record.present) },
+          })
+        )
       );
-
       res.json({ message: "Attendance recorded successfully", results });
     } catch (error) {
       console.error(error);
@@ -539,27 +523,25 @@ router.post(
 // GET /api/admin/session/:sessionId/attendance - Get attendance for a session
 router.get(
   "/admin/session/:sessionId/attendance",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("sessionId").isString().trim().notEmpty().withMessage("Session ID is required")],
   validate,
   async (req, res) => {
-    const { sessionId } = req.params;
+    const { sessionId } = req.params as any;
 
     try {
-      const attendance = await prisma.attendanceRecord.findMany({
+      const attendance = await (prisma as any).kruzhokAttendance.findMany({
         where: { sessionId },
-        include: {
-          member: {
-            include: {
-              user: {
-                select: { id: true, fullName: true, email: true },
-              },
-            },
-          },
-        },
+        include: { extraStudent: true },
       });
-      res.json(attendance);
+      const rows = (attendance || []).map((a: any) => ({
+        studentId: a.extraStudentId,
+        fullName: a.extraStudent?.fullName,
+        present: a.present,
+        markedAt: a.markedAt,
+      }))
+      res.json(rows);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Failed to fetch attendance" });
@@ -569,8 +551,8 @@ router.get(
 
 // --- PUBLIC/USER ROUTES ---
 
-// GET /api/kruzhok - Get a list of all active Kruzhoks
-router.get("/kruzhok", async (_req, res) => {
+// GET / - Get a list of all active Kruzhoks
+router.get("/", async (_req, res) => {
   try {
     const kruzhoks = await prisma.kruzhok.findMany({
       where: { isActive: true },
@@ -590,10 +572,10 @@ router.get("/kruzhok", async (_req, res) => {
   }
 });
 
-// POST /api/kruzhok/enroll-by-code - User enrollment using access code
+// POST /enroll-by-code - User enrollment using access code
 router.post(
-  "/kruzhok/enroll-by-code",
-  requireAuth,
+  "/enroll-by-code",
+  protect,
   [body("accessCode").isString().trim().notEmpty().withMessage("Access code is required")],
   validate,
   async (req, res) => {
@@ -652,8 +634,8 @@ router.post(
   }
 );
 
-// GET /api/kruzhok/my-clubs - Get a list of clubs the authenticated user is enrolled in
-router.get("/kruzhok/my-clubs", requireAuth, async (req, res) => {
+// GET /my-clubs - Get a list of clubs the authenticated user is enrolled in
+router.get("/my-clubs", protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
@@ -684,8 +666,8 @@ router.get("/kruzhok/my-clubs", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/kruzhok/my-requests - Get user's pending enrollment requests
-router.get("/kruzhok/my-requests", requireAuth, async (req, res) => {
+// GET /my-requests - Get user's pending enrollment requests
+router.get("/my-requests", protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
@@ -708,8 +690,8 @@ router.get("/kruzhok/my-requests", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/kruzhok/my-attendance - Get the authenticated user's attendance record
-router.get("/kruzhok/my-attendance", requireAuth, async (req, res) => {
+// GET /my-attendance - Get the authenticated user's attendance record
+router.get("/my-attendance", protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
@@ -764,4 +746,352 @@ router.get("/kruzhok/my-attendance", requireAuth, async (req, res) => {
   }
 });
 
-export { router };
+// GET /all-user-data - Aggregated data for Kruzhok page
+router.get("/all-user-data", protect, async (req, res) => {
+  try {
+    const userId = req.user.id
+
+    const [allKruzhoks, myApprovedEnrollments, myPendingRequests, subscription] = await Promise.all([
+      prisma.kruzhok.findMany({
+        where: { isActive: true },
+        include: {
+          admin: { select: { fullName: true } },
+          _count: { select: { members: true } },
+        },
+      }),
+      prisma.kruzhokMember.findMany({
+        where: { userId, enrollmentStatus: "APPROVED" },
+        include: { kruzhok: { include: { admin: { select: { fullName: true } }, _count: { select: { members: true } } } } },
+      }),
+      prisma.kruzhokMember.findMany({
+        where: { userId, enrollmentStatus: "PENDING" },
+        select: { id: true, kruzhokId: true },
+      }),
+      prisma.subscription.findUnique({ where: { userId } }).catch(() => null as any),
+    ])
+
+    const myKruzhoks = myApprovedEnrollments.map((e) => e.kruzhok)
+    const canCreateKruzhok = (req.user.role === "ADMIN") || (!!subscription && (subscription as any).status === "ACTIVE")
+
+    res.json({
+      myKruzhoks,
+      allKruzhoks,
+      myRequests: myPendingRequests,
+      canCreateKruzhok,
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "Failed to fetch user data" })
+  }
+})
+
+// Attendance: list grid data
+router.get(
+  "/:kruzhokId/attendance",
+  protect,
+  [
+    param("kruzhokId").isString().trim().notEmpty(),
+    query("from").optional().isISO8601().toDate(),
+    query("to").optional().isISO8601().toDate(),
+  ],
+  validate,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { kruzhokId } = req.params as any
+      const userId = req.user!.id
+      const kruzhok = await prisma.kruzhok.findUnique({ where: { id: kruzhokId } })
+      if (!kruzhok) return res.status(404).json({ message: "Kruzhok not found" })
+      const isOwner = (kruzhok as any)?.adminId === userId || (kruzhok as any)?.ownerId === userId
+      const isAdminUser = req.user!.role === "ADMIN"
+      const canView = isOwner || isAdminUser
+      if (!canView) {
+        const m = await prisma.kruzhokSubscription.findFirst({ where: { kruzhokId, userId } }).catch(() => null as any)
+        if (!m) return res.status(403).json({ message: "Forbidden" })
+      }
+
+      const fromDate: Date | undefined = (req.query as any).from
+      const toDate: Date | undefined = (req.query as any).to
+      const whereSession: any = { kruzhokId }
+      if (fromDate || toDate) whereSession.date = {}
+      if (fromDate) whereSession.date.gte = fromDate
+      if (toDate) whereSession.date.lte = toDate
+
+      const [students, sessions] = await Promise.all([
+        (prisma as any).kruzhokExtraStudent.findMany({ where: { kruzhokId }, orderBy: { createdAt: "asc" } }),
+        (prisma as any).kruzhokSession.findMany({ where: whereSession, orderBy: { date: "asc" } }),
+      ])
+      const sessionIds = sessions.map((s: any) => s.id)
+      const attendance = sessionIds.length
+        ? await (prisma as any).kruzhokAttendance.findMany({ where: { sessionId: { in: sessionIds } } })
+        : []
+
+      const dates = sessions.map((s: any) => new Date(s.date).toISOString().slice(0, 10))
+      const marks: Record<string, Record<string, boolean>> = {}
+      for (const st of students) marks[st.id] = {}
+      for (const a of attendance as any[]) {
+        const ses = sessions.find((s: any) => s.id === a.sessionId)
+        if (!ses) continue
+        const d = new Date(ses.date).toISOString().slice(0, 10)
+        if (!marks[a.extraStudentId]) marks[a.extraStudentId] = {}
+        marks[a.extraStudentId][d] = Boolean(a.present)
+      }
+
+      res.json({
+        students: students.map((s: any) => ({ id: s.id, fullName: s.fullName })),
+        dates,
+        marks,
+      })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: "Failed to load attendance" })
+    }
+  }
+)
+
+// Attendance: add student (mentor/admin)
+router.post(
+  "/:kruzhokId/students",
+  protect,
+  [param("kruzhokId").isString().trim().notEmpty(), body("fullName").isString().trim().notEmpty()],
+  validate,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { kruzhokId } = req.params as any
+      const { fullName } = req.body as any
+      const kruzhok = await prisma.kruzhok.findUnique({ where: { id: kruzhokId } })
+      if (!kruzhok) return res.status(404).json({ message: "Kruzhok not found" })
+      const isOwner = (kruzhok as any)?.adminId === req.user!.id || (kruzhok as any)?.ownerId === req.user!.id
+      const isAdminUser = req.user!.role === "ADMIN"
+      if (!isOwner && !isAdminUser) return res.status(403).json({ message: "Forbidden" })
+      const created = await (prisma as any).kruzhokExtraStudent.create({ data: { kruzhokId, fullName } })
+      res.status(201).json({ id: created.id, fullName: created.fullName })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: "Failed to add student" })
+    }
+  }
+)
+
+// Attendance: add date (session)
+router.post(
+  "/:kruzhokId/sessions",
+  protect,
+  [param("kruzhokId").isString().trim().notEmpty(), body("date").isISO8601().toDate(), body("topic").optional().isString()],
+  validate,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { kruzhokId } = req.params as any
+      const { date, topic } = req.body as any
+      const kruzhok = await prisma.kruzhok.findUnique({ where: { id: kruzhokId } })
+      if (!kruzhok) return res.status(404).json({ message: "Kruzhok not found" })
+      const isOwner = (kruzhok as any)?.adminId === req.user!.id || (kruzhok as any)?.ownerId === req.user!.id
+      const isAdminUser = req.user!.role === "ADMIN"
+      if (!isOwner && !isAdminUser) return res.status(403).json({ message: "Forbidden" })
+      const created = await (prisma as any).kruzhokSession.upsert({
+        where: { kruzhokId_date: { kruzhokId, date } },
+        update: { topic: topic ?? undefined },
+        create: { kruzhokId, date, topic },
+      })
+      res.status(201).json({ id: created.id, date: created.date, topic: created.topic })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: "Failed to add session" })
+    }
+  }
+)
+
+// Attendance: toggle mark
+router.post(
+  "/:kruzhokId/attendance/toggle",
+  protect,
+  [param("kruzhokId").isString().trim().notEmpty(), body("studentId").isString().notEmpty(), body("date").isISO8601().toDate()],
+  validate,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { kruzhokId } = req.params as any
+      const { studentId, date } = req.body as any
+      const kruzhok = await prisma.kruzhok.findUnique({ where: { id: kruzhokId } })
+      if (!kruzhok) return res.status(404).json({ message: "Kruzhok not found" })
+      const isOwner = (kruzhok as any)?.adminId === req.user!.id || (kruzhok as any)?.ownerId === req.user!.id
+      const isAdminUser = req.user!.role === "ADMIN"
+      if (!isOwner && !isAdminUser) return res.status(403).json({ message: "Forbidden" })
+
+      const session = await (prisma as any).kruzhokSession.upsert({
+        where: { kruzhokId_date: { kruzhokId, date } },
+        update: {},
+        create: { kruzhokId, date },
+      })
+      const existing = await (prisma as any).kruzhokAttendance.findUnique({
+        where: { sessionId_extraStudentId: { sessionId: session.id, extraStudentId: studentId } },
+      }).catch(() => null as any)
+      if (!existing) {
+        const created = await (prisma as any).kruzhokAttendance.create({
+          data: { sessionId: session.id, extraStudentId: studentId, present: true, markedById: req.user!.id },
+        })
+        return res.status(201).json({ present: created.present })
+      }
+      const updated = await (prisma as any).kruzhokAttendance.update({
+        where: { sessionId_extraStudentId: { sessionId: session.id, extraStudentId: studentId } },
+        data: { present: !existing.present, markedById: req.user!.id, markedAt: new Date() },
+      })
+      res.json({ present: updated.present })
+    } catch (error) {
+      console.error(error)
+      res.status(500).json({ message: "Failed to toggle attendance" })
+    }
+  }
+)
+
+// GET /:id - Kruzhok details (basic)
+router.get("/:id", protect, async (req, res) => {
+  try {
+    const { id } = req.params
+    const k = await prisma.kruzhok.findUnique({
+      where: { id },
+      include: { admin: { select: { fullName: true } } },
+    })
+    if (!k) return res.status(404).json({ message: "Kruzhok not found" })
+    res.json({ id: k.id, name: k.name, description: k.description, accessCode: (k as any).accessCode, admin: k.admin })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "Failed to fetch kruzhok" })
+  }
+})
+
+// GET /:kruzhokId/scheduled-lessons - simplified schedule feed compatible with client
+router.get("/:kruzhokId/scheduled-lessons", protect, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" })
+    const { kruzhokId } = req.params as { kruzhokId: string }
+    const userId = req.user.id
+
+    // membership/owner/admin check (similar to kruzhok-lessons router)
+    const [member, kruzhok] = await Promise.all([
+      prisma.kruzhokMember.findUnique({ where: { kruzhokId_userId: { kruzhokId, userId } } }),
+      prisma.kruzhok.findUnique({ where: { id: kruzhokId } }),
+    ])
+    const isOwner = (kruzhok as any)?.adminId === userId
+    const isAdmin = req.user.role === "ADMIN"
+    if (!member && !isOwner && !isAdmin) return res.status(403).json({ message: "Not a member of this kruzhok" })
+
+    const lessons = await prisma.kruzhokLesson.findMany({
+      where: { kruzhokId },
+      orderBy: { orderIndex: "asc" },
+      include: {
+        quizzes: { select: { id: true, isActive: true, title: true } },
+        matchingGames: { select: { id: true, isActive: true, title: true } },
+      },
+    })
+
+    const result = lessons.map((l: any) => ({
+      id: l.id,
+      title: l.title,
+      orderIndex: l.orderIndex ?? 0,
+      lessonTemplateId: l.id,
+      lessonTemplate: {
+        mediaType: l.videoUrl ? "video" : (l.presentationUrl ? "presentation" : "resource"),
+        contentUrl: l.videoUrl || l.presentationUrl || null,
+        scenarioText: l.content || null,
+        quizId: (l.quizzes && l.quizzes.length > 0) ? l.quizzes[0].id : null,
+      },
+      progress: undefined,
+      scheduledDate: new Date().toISOString(),
+      isAvailable: true,
+    }))
+    res.json(result)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: "Failed to fetch lessons" })
+  }
+})
+
+// GET /:kruzhokId/lessons/:lessonId - normalized lesson details for client
+router.get("/:kruzhokId/lessons/:lessonId", protect, async (req: AuthenticatedRequest, res: Response) => {
+try {
+if (!req.user) return res.status(401).json({ message: "Unauthorized" })
+const { kruzhokId, lessonId } = req.params as { kruzhokId: string; lessonId: string }
+const userId = req.user.id
+
+const [member, lesson, kruzhok] = await Promise.all([
+  prisma.kruzhokMember.findUnique({ where: { kruzhokId_userId: { kruzhokId, userId } } }),
+  prisma.kruzhokLesson.findUnique({
+    where: { id: lessonId },
+    include: {
+      quizzes: { include: { questions: { orderBy: { orderIndex: "asc" } } } },
+      matchingGames: { include: { pairs: { orderBy: { orderIndex: "asc" } } } },
+      kruzhok: { select: { adminId: true, accessCode: true } },
+    },
+  }),
+  prisma.kruzhok.findUnique({ where: { id: kruzhokId }, select: { adminId: true, accessCode: true } }),
+])
+
+if (!lesson) return res.status(404).json({ message: "Lesson not found" })
+
+const isOwner = kruzhok?.adminId === userId
+const isAdmin = req.user.role === "ADMIN"
+if (!member && !isOwner && !isAdmin) return res.status(403).json({ message: "Not a member of this kruzhok" })
+
+const payload = {
+  id: lesson.id,
+  title: lesson.title,
+  lessonTemplate: {
+    mediaType: (lesson as any).videoUrl ? "video" : ((lesson as any).presentationUrl ? "presentation" : "resource"),
+    contentUrl: (lesson as any).videoUrl || (lesson as any).presentationUrl || null,
+    scenarioText: (lesson as any).content || null,
+    quizId: (lesson.quizzes && lesson.quizzes.length > 0) ? lesson.quizzes[0].id : null,
+  },
+  isMentor: isOwner || isAdmin,
+  content: (lesson as any).content || null,
+  showAccessCode: (lesson as any).showAccessCode || false,
+  kruzhok: { accessCode: kruzhok?.accessCode },
+  quizzes: lesson.quizzes,
+  matchingGames: lesson.matchingGames,
+}
+
+res.json(payload)
+} catch (error) {
+console.error(error)
+res.status(500).json({ message: "Failed to fetch lesson" })
+}
+})
+
+// POST /:kruzhokId/lessons/:lessonId/complete - mark progress
+router.post("/:kruzhokId/lessons/:lessonId/complete", protect, async (req: AuthenticatedRequest, res: Response) => {
+try {
+if (!req.user) return res.status(401).json({ message: "Unauthorized" })
+const { kruzhokId, lessonId } = req.params as { kruzhokId: string; lessonId: string }
+const userId = req.user.id
+const { watchTimeSeconds } = (req.body || {}) as { watchTimeSeconds?: number }
+
+const member = await prisma.kruzhokMember.findUnique({ where: { kruzhokId_userId: { kruzhokId, userId } } })
+if (!member) return res.status(403).json({ message: "Not a member of this kruzhok" })
+
+const progress = await prisma.kruzhokLessonProgress.upsert({
+  where: { lessonId_memberId: { lessonId, memberId: member.id } },
+  update: { isCompleted: true, completedAt: new Date(), watchTimeSeconds: watchTimeSeconds || 0 },
+  create: { lessonId, memberId: member.id, isCompleted: true, completedAt: new Date(), watchTimeSeconds: watchTimeSeconds || 0 },
+})
+
+res.json(progress)
+} catch (error) {
+console.error(error)
+res.status(500).json({ message: "Failed to mark lesson as complete" })
+}
+})
+
+// POST /:kruzhokId/lessons/:lessonId/end - no-op endpoint to signal end of lesson for mentors
+router.post("/:kruzhokId/lessons/:lessonId/end", protect, async (req: AuthenticatedRequest, res: Response) => {
+try {
+if (!req.user) return res.status(401).json({ message: "Unauthorized" })
+const { kruzhokId } = req.params as { kruzhokId: string }
+const userId = req.user.id
+const k = await prisma.kruzhok.findUnique({ where: { id: kruzhokId } })
+const isOwner = k?.adminId === userId
+const isAdmin = req.user.role === "ADMIN"
+if (!isOwner && !isAdmin) return res.status(403).json({ message: "Forbidden" })
+res.json({ ok: true })
+} catch (error) {
+console.error(error)
+res.status(500).json({ message: "Failed to end lesson" })
+}
+});

@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/auth-context"
 import { toast } from "@/hooks/use-toast"
 import { EmailVerification } from "@/components/auth/email-verification"
 import { RegisterVerification } from "@/components/auth/register-verification"
+import { setTokens } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,6 +25,11 @@ export default function LoginPage() {
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false)
   const [requiresRegisterVerification, setRequiresRegisterVerification] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState("")
+  const [isForgot, setIsForgot] = useState(false)
+  const [forgotSent, setForgotSent] = useState(false)
+  const [resetCode, setResetCode] = useState("")
+  const [newPwd, setNewPwd] = useState("")
+  const [newPwd2, setNewPwd2] = useState("")
 
   useEffect(() => {
     if (!loading && user) {
@@ -106,29 +112,61 @@ export default function LoginPage() {
   }
 
   const handleLoginVerificationSuccess = async (data: any) => {
-    // Set tokens and user data
-    localStorage.setItem("accessToken", data.accessToken)
-    localStorage.setItem("refreshToken", data.refreshToken)
-    
-    // Redirect to dashboard
-    router.push("/dashboard")
-    router.refresh()
+    // Persist tokens using shared helper so AuthProvider can read them
+    setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken })
+    // Full reload to ensure AuthProvider re-initializes user
+    window.location.assign("/dashboard")
   }
 
   const handleRegisterVerificationSuccess = async (data: any) => {
-    // Set tokens and user data
-    localStorage.setItem("accessToken", data.accessToken)
-    localStorage.setItem("refreshToken", data.refreshToken)
-    
-    // Redirect to dashboard
-    router.push("/dashboard")
-    router.refresh()
+    setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken })
+    window.location.assign("/dashboard")
   }
 
   const handleBackToLogin = () => {
     setRequiresEmailVerification(false)
     setRequiresRegisterVerification(false)
     setVerificationEmail("")
+    setIsForgot(false)
+    setForgotSent(false)
+    setResetCode("")
+    setNewPwd("")
+    setNewPwd2("")
+  }
+
+  const handleForgot = async () => {
+    try {
+      if (!forgotSent) {
+        if (!email.trim()) { toast({ title: "Введите почту", variant: "destructive" as any }); return }
+        const res = await fetch("/api/auth/forgot-password", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: email.trim() })
+        })
+        if (!res.ok) throw new Error((await res.json()).error || "Не удалось отправить код")
+        setForgotSent(true)
+        toast({ title: "Отправлено", description: "Код отправлен на почту" })
+      } else {
+        if (resetCode.length !== 6) { toast({ title: "Код из 6 цифр", variant: "destructive" as any }); return }
+        if (newPwd.length < 8) { toast({ title: "Минимум 8 символов", variant: "destructive" as any }); return }
+        if (newPwd !== newPwd2) { toast({ title: "Пароли не совпадают", variant: "destructive" as any }); return }
+        const res = await fetch("/api/auth/reset-password", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), code: resetCode, newPassword: newPwd })
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Не удалось изменить пароль")
+        toast({ title: "Пароль обновлён", description: "Теперь войдите с новым паролем" })
+        setIsForgot(false)
+        setForgotSent(false)
+        setResetCode("")
+        setNewPwd("")
+        setNewPwd2("")
+      }
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Проверьте данные", variant: "destructive" as any })
+    }
   }
 
   if (requiresEmailVerification) {
@@ -212,7 +250,6 @@ export default function LoginPage() {
       </div>
     )
   }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 relative bg-dots-pattern">
       <div className={`${isLogin ? "mb-12" : "mb-16"} animate-slide-up`} style={{ animationDelay: "200ms" }}>
@@ -272,6 +309,7 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
+
           <div className="space-y-6">
             <div className="relative animate-slide-up" style={{ animationDelay: "700ms" }}>
               <Input
@@ -293,35 +331,76 @@ export default function LoginPage() {
               />
               <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
             </div>
+
+            {isLogin && isForgot && (
+              <div className="space-y-4 animate-slide-up" style={{ animationDelay: "820ms" }}>
+                {!forgotSent ? (
+                  <div className="text-[#a7a7a7] text-sm">Мы отправим код на указанную почту</div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    <Input
+                      type="text"
+                      placeholder="Код из письма (6 цифр)"
+                      value={resetCode}
+                      onChange={(e)=>setResetCode(e.target.value)}
+                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Новый пароль"
+                      value={newPwd}
+                      onChange={(e)=>setNewPwd(e.target.value)}
+                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Повторите пароль"
+                      value={newPwd2}
+                      onChange={(e)=>setNewPwd2(e.target.value)}
+                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
+                    />
+                  </div>
+                )}
+                <Button
+                  onClick={handleForgot}
+                  className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-2.5 rounded-full transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
+                >
+                  {!forgotSent ? "Отправить код" : "Сменить пароль"}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {!isForgot && (
         <Button
           onClick={isLogin ? handleLogin : handleRegister}
-          className={`w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full ${isLogin ? "mt-8" : "mt-8"} transition-all duration-300 transform hover:scale-102 active:scale-95 animate-slide-up`}
+          className={`w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full ${isLogin ? "mt-8" : "mt-8"} transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up`}
           style={{ animationDelay: "900ms" }}
         >
           {isLogin ? "Войти" : "Зарегистрироваться"}
         </Button>
+      )}
 
-        {isLogin && (
-          <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
-            <button
-              onClick={() => router.push(`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ''}`)}
-              className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300"
-            >
-              Забыли пароль?
-            </button>
-          </div>
-        )}
-
-        <div className="text-center mt-6 animate-slide-up" style={{ animationDelay: "1000ms" }}>
+      {isLogin && (
+        <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
           <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300 transform hover:scale-101"
+            onClick={() => { setIsForgot((v) => !v); if (!isForgot) { setForgotSent(false); setResetCode(""); setNewPwd(""); setNewPwd2("") } }}
+            className={`text-[#a7a7a7] text-sm transition-all duration-300 hover:text-white ${isForgot ? 'text-white' : ''}`}
           >
-            {isLogin ? "Нет аккаунта? Зарегистрируйтесь" : "Войти"}
+            {isForgot ? "Вернуться к входу" : "Забыли пароль?"}
           </button>
         </div>
+      )}
+
+      <div className="text-center mt-6 animate-slide-up" style={{ animationDelay: "1000ms" }}>
+        <button
+          onClick={() => setIsLogin(!isLogin)}
+          className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300 transform hover:scale-101"
+        >
+          {isLogin ? "Нет аккаунта? Зарегистрируйтесь" : "Войти"}
+        </button>
       </div>
 
       <SocialPanel />

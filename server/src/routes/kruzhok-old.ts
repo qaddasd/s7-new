@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { body, param, query } from "express-validator";
 import { validate } from "../middleware/validate.js";
-import { requireAdmin, requireAuth } from "../middleware/auth.js";
+import { isAdmin, protect } from "../middleware/auth.js";
 import { UserRole } from "@prisma/client";
 
 const router = Router();
@@ -12,8 +12,8 @@ const router = Router();
 // POST /api/admin/kruzhok - Create a new Kruzhok
 router.post(
   "/admin/kruzhok",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     body("name").isString().trim().notEmpty().withMessage("Kruzhok name is required"),
     body("description").optional().isString().trim(),
@@ -44,8 +44,8 @@ router.post(
 // PUT /api/admin/kruzhok/:id - Update Kruzhok details
 router.put(
   "/admin/kruzhok/:id",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("name").optional().isString().trim().notEmpty(),
@@ -81,8 +81,8 @@ router.put(
 // DELETE /api/admin/kruzhok/:id - Delete a Kruzhok
 router.delete(
   "/admin/kruzhok/:id",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -103,8 +103,8 @@ router.delete(
 // POST /api/admin/kruzhok/:id/enroll - Enroll a user into the Kruzhok
 router.post(
   "/admin/kruzhok/:id/enroll",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("userId").isString().trim().notEmpty().withMessage("User ID is required"),
@@ -151,8 +151,8 @@ router.post(
 // DELETE /api/admin/kruzhok/:kruzhokId/unenroll/:userId - Unenroll a user
 router.delete(
   "/admin/kruzhok/:kruzhokId/unenroll/:userId",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("kruzhokId").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     param("userId").isString().trim().notEmpty().withMessage("User ID is required"),
@@ -181,8 +181,8 @@ router.delete(
 // GET /api/admin/kruzhok/:id/members - Get all members of a Kruzhok
 router.get(
   "/admin/kruzhok/:id/members",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -208,8 +208,8 @@ router.get(
 // POST /api/admin/kruzhok/:id/session - Create a new session for a Kruzhok
 router.post(
   "/admin/kruzhok/:id/session",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required"),
     body("sessionDate").isISO8601().toDate().withMessage("Valid session date is required"),
@@ -239,8 +239,8 @@ router.post(
 // GET /api/admin/kruzhok/:id/sessions - Get all sessions for a Kruzhok
 router.get(
   "/admin/kruzhok/:id/sessions",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("id").isString().trim().notEmpty().withMessage("Kruzhok ID is required")],
   validate,
   async (req, res) => {
@@ -263,8 +263,8 @@ router.get(
 // Expects body: [{ memberId: string, status: 'present' | 'absent' | 'late' | 'excused', notes?: string }]
 router.post(
   "/admin/session/:sessionId/attendance",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [
     param("sessionId").isString().trim().notEmpty().withMessage("Session ID is required"),
     body().isArray().withMessage("Body must be an array of attendance records"),
@@ -314,8 +314,8 @@ router.post(
 // GET /api/admin/session/:sessionId/attendance - Get attendance for a session
 router.get(
   "/admin/session/:sessionId/attendance",
-  requireAuth,
-  requireAdmin,
+  protect,
+  isAdmin,
   [param("sessionId").isString().trim().notEmpty().withMessage("Session ID is required")],
   validate,
   async (req, res) => {
@@ -367,7 +367,7 @@ router.get("/kruzhok", async (_req, res) => {
 });
 
 // GET /api/kruzhok/my-clubs - Get a list of clubs the authenticated user is enrolled in
-router.get("/kruzhok/my-clubs", requireAuth, async (req, res) => {
+router.get("/kruzhok/my-clubs", protect, async (req, res) => {
   const userId = req.user.id;
 
   try {
@@ -396,7 +396,7 @@ router.get("/kruzhok/my-clubs", requireAuth, async (req, res) => {
 });
 
 // GET /api/kruzhok/my-attendance - Get the authenticated user's attendance record
-router.get("/kruzhok/my-attendance", requireAuth, async (req, res) => {
+router.get("/kruzhok/my-attendance", protect, async (req, res) => {
   const userId = req.user.id;
 
   try {

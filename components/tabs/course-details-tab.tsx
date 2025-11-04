@@ -1,11 +1,11 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { ArrowLeft, BadgeInfo, LogIn, ShoppingCart, CheckCircle, ShieldAlert, Copy } from "lucide-react"
-import { useAuth } from "@/components/auth/auth-context"
 import { useConfirm } from "@/components/ui/confirm"
 import { toast } from "@/hooks/use-toast"
 import { apiFetch } from "@/lib/api"
+import { useAuth } from "@/components/auth/auth-context"
 import { social } from "@/lib/site-config"
 
 export interface CourseLesson {
@@ -55,6 +55,7 @@ export default function CourseDetailsTab({
   const [showPayment, setShowPayment] = useState(false)
   const [canAccess, setCanAccess] = useState<boolean>(false)
   const [fullCourse, setFullCourse] = useState<CourseDetails | null>(course)
+  const [missions, setMissions] = useState<Array<{ id: string; text: string; xp?: number }>>([])
 
   const isFree = !course?.price || course.price === 0
 
@@ -89,6 +90,19 @@ export default function CourseDetailsTab({
       .catch(() => setCanAccess(isFree))
     return () => { ignore = true }
   }, [course?.id, isFree])
+
+  useEffect(() => {
+    let ignore = false
+    if (!course?.id) return
+    apiFetch<any[]>(`/courses/${course.id}/questions`)
+      .then((list) => {
+        if (ignore) return
+        const items = (list || []).map((q: any) => ({ id: q.id, text: q.text, xp: q.xpReward || 100 }))
+        setMissions(items)
+      })
+      .catch(() => setMissions([]))
+    return () => { ignore = true }
+  }, [course?.id])
 
   const handlePurchase = () => {
     if (!user || !course) { toast({ title: "Войдите", description: "Войдите чтобы купить курс" }); return }
@@ -133,16 +147,101 @@ export default function CourseDetailsTab({
           <BadgeInfo className="w-5 h-5 text-[#a0a0b0]" />
           <span>Курс не найден. Вернитесь назад и выберите курс.</span>
         </div>
+
+      <div className="mt-10">
+        <button
+          onClick={() => canAccess && onOpenLesson?.(activeModule.id, activeModule?.lessons?.[0]?.id ?? 0)}
+          disabled={!canAccess}
+          className="w-full rounded-full h-12 bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold disabled:opacity-50"
+        >
+          Продолжить
+        </button>
+      </div>
       </div>
     )
   }
 
   const viewCourse = fullCourse || course
   const activeModule = viewCourse.modules.find((m) => String(m.id) === String(activeModuleId)) || viewCourse.modules[0]
+  const xpTarget = useMemo(() => {
+    const sum = (missions || []).reduce((acc, m) => acc + (Number(m.xp || 0)), 0)
+    return sum > 0 ? sum : 100
+  }, [missions])
+  const currentXp = Math.max(0, Number(user?.xp || 0))
+  const xpProgress = xpTarget > 0 ? Math.min(100, Math.round((currentXp % xpTarget) / xpTarget * 100)) : 0
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      
+      {/* Gamification header */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 mb-8">
+        <div className="relative bg-transparent">
+          <div className="flex gap-6">
+            <div className="w-16 bg-[#16161c] border border-[#2a2a35] rounded-2xl p-3 flex flex-col items-center justify-between">
+              <div className="text-white/60 text-xs text-center">До получения сертификата</div>
+              <div className="text-white font-bold text-lg">{xpTarget}xp</div>
+              <div className="h-64 w-2 bg-[#0f0f14] rounded-full overflow-hidden my-3 border border-[#2a2a35]">
+                <div className="bg-[#00a3ff] w-full" style={{ height: `${xpProgress}%` }} />
+              </div>
+            </div>
+            <div className="relative flex-1 min-h-[280px]">
+              {(missions.slice(0, 6)).map((m, i) => (
+                <div
+                  key={i}
+                  className="absolute w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#16161c] border border-[#2a2a35] text-white flex items-center justify-center shadow-sm"
+                  style={{ left: `${i * 12}%`, top: `${i * 12}%` }}
+                >
+                  <div className="text-center leading-tight">
+                    <div className="text-sm">{i + 1}</div>
+                    <div className="text-[10px] text-[#00a3ff]">+{m.xp ?? 0}xp</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <aside>
+          <div className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-5 text-white">
+            <div className="text-white/80 text-sm mb-2">Ежедневные миссии</div>
+            {missions.length === 0 ? (
+              <div className="text-white/60 text-sm">Миссии пока не добавлены</div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-xl bg-[#0f0f14] border border-[#2a2a35] p-4">
+                  <div className="font-semibold mb-1 truncate">{missions[0].text}</div>
+                  <div className="text-white/60 text-xs mb-2">Миссия</div>
+                  <div className="h-2 w-full bg-[#1b1b22] rounded-full overflow-hidden">
+                    <div className="h-full bg-[#00a3ff]" style={{ width: '40%' }} />
+                  </div>
+                  <div className="text-[#00a3ff] text-xs mt-2">+{missions[0].xp ?? 20}xp</div>
+                </div>
+              </div>
+            )}
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  if (!course?.id) return
+                  const text = prompt('Текст миссии (вопрос)?') || ''
+                  const optA = prompt('Вариант A') || 'A'
+                  const optB = prompt('Вариант B') || 'B'
+                  const xp = Number(prompt('XP (по умолчанию 100)') || '100')
+                  apiFetch(`/courses/${course.id}/questions`, {
+                    method: 'POST',
+                    body: JSON.stringify({ text, options: [optA, optB], correctIndex: 0, xpReward: xp })
+                  }).then(() => {
+                    return apiFetch<any[]>(`/courses/${course.id}/questions`)
+                  }).then((list) => {
+                    const items = (list || []).slice(0, 5).map((q: any) => ({ id: q.id, text: q.text, xp: q.xpReward || 20 }))
+                    setMissions(items)
+                  })
+                }}
+                className="mt-4 w-full rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium py-2"
+              >
+                Добавить миссию
+              </button>
+            )}
+          </div>
+        </aside>
+      </div>
       <div className="mb-6 flex items-center gap-2 text-white">
         <button
           onClick={onBack}

@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { body, param } from "express-validator";
-import { validate } from "../middleware/validate.js";
-import { requireAuth } from "../middleware/auth.js";
+import { validate } from "../middleware/validate";
+import { protect } from "../middleware/auth.js";
 import crypto from "crypto";
 
 const router = Router();
@@ -23,7 +23,7 @@ function generateSessionCode(): string {
 // POST /api/kruzhok/:kruzhokId/lessons/:lessonId/quiz - Квиз құру
 router.post(
   "/kruzhok/:kruzhokId/lessons/:lessonId/quiz",
-  requireAuth,
+  protect,
   [
     param("kruzhokId").isString().trim().notEmpty(),
     param("lessonId").isString().trim().notEmpty(),
@@ -76,7 +76,7 @@ router.post(
 // POST /api/kruzhok/quiz/:quizId/questions - Квизге сұрақ қосу
 router.post(
   "/kruzhok/quiz/:quizId/questions",
-  requireAuth,
+  protect,
   [
     param("quizId").isString().trim().notEmpty(),
     body("questionText").isString().trim().notEmpty(),
@@ -116,7 +116,7 @@ router.post(
 // POST /api/kruzhok/quiz/:quizId/session/start - Квиз сессиясын бастау
 router.post(
   "/kruzhok/quiz/:quizId/session/start",
-  requireAuth,
+  protect,
   [param("quizId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {
@@ -172,7 +172,7 @@ router.post(
 // POST /api/kruzhok/quiz/session/join - Сессияға қосылу (код арқылы)
 router.post(
   "/kruzhok/quiz/session/join",
-  requireAuth,
+  protect,
   [
     body("sessionCode").isString().trim().notEmpty().withMessage("Session code is required"),
     body("nickname").optional().isString().trim(),
@@ -246,7 +246,7 @@ router.post(
 // POST /api/kruzhok/quiz/session/:sessionId/answer - Жауап беру
 router.post(
   "/kruzhok/quiz/session/:sessionId/answer",
-  requireAuth,
+  protect,
   [
     param("sessionId").isString().trim().notEmpty(),
     body("questionId").isString().trim().notEmpty(),
@@ -377,7 +377,7 @@ router.post(
 // GET /api/kruzhok/quiz/session/:sessionId/leaderboard - Рейтинг кестесі
 router.get(
   "/kruzhok/quiz/session/:sessionId/leaderboard",
-  requireAuth,
+  protect,
   [param("sessionId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {
@@ -420,7 +420,7 @@ router.get(
 // POST /api/kruzhok/quiz/session/:sessionId/end - Сессияны аяқтау
 router.post(
   "/kruzhok/quiz/session/:sessionId/end",
-  requireAuth,
+  protect,
   [param("sessionId").isString().trim().notEmpty()],
   validate,
   async (req, res) => {

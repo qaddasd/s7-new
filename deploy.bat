@@ -20,7 +20,7 @@ REM Prisma: выполнять ли db push/generate
 set "DO_DB_PUSH=1"
 
 REM Prisma: дропнуть таблицу ByteSizeLike перед пушем (быстрый безопасный путь)
-set "DROP_LIKES=1"
+set "DROP_LIKES=0"
 
 REM (опц.) путь до SSH-ключа в Windows. Если стандартный — оставьте закомментированным.
 REM set "SSH_KEY=%USERPROFILE%\.ssh\id_rsa"
@@ -61,18 +61,14 @@ echo === Deploy to %USER%@%HOST% ===
   fi
   npm run build || true
 
-  if [ \"%DO_DB_PUSH%\" = \"1\" ]; then
+  if [ "%DO_DB_PUSH%" = "1" ]; then
     echo
-    echo \"[Prisma] DB prepare\"
-    cd %APP_DIR%
-    if [ \"%DROP_LIKES%\" = \"1\" ]; then
-      echo \"- drop ByteSizeLike\"
-      printf \"DROP TABLE IF EXISTS \\\"ByteSizeLike\\\" CASCADE;\\n\" | npx prisma db execute --schema ./prisma/schema.prisma --stdin
-    fi
-    echo \"- db push\"
-    npx prisma db push --schema ./prisma/schema.prisma --accept-data-loss
-    echo \"- prisma generate\"
-    npx prisma generate --schema ./prisma/schema.prisma
+    echo "[Prisma] Migrate deploy (safe)"
+    cd %BE_DIR%
+    echo "- prisma generate"
+    npm run prisma:generate
+    echo "- prisma migrate deploy"
+    npm run prisma:migrate:deploy
   fi
 
   echo

@@ -1,3 +1,4 @@
+
 "use client"
 import { useState, useEffect } from "react"
 import Image from "next/image"
@@ -49,15 +50,15 @@ export default function Sidebar({
   }, [isCollapsed, onCollapseChange])
 
   const navItems = [
-    { id: "home", label: "Главная", icon: Home },
-    { id: "courses", label: "Курсы", icon: BookOpen },
-    { id: "kruzhok", label: "Кружок", icon: Calendar },
-    { id: "s7-tools", label: "S7 Tools", icon: Wrench },
-    { id: "teams", label: "Команда", icon: Users },
-    { id: "profile", label: "Профиль", icon: User },
-    { id: "masterclass", label: "Мастер классы", icon: GraduationCap },
-    { id: "bytesize", label: "ByteSize", icon: FileText },
-    ...(user?.role === 'admin' ? [{ id: "admin", label: "Админ", icon: Shield }] as const : []),
+    { id: "home", label: "Главная", icon: Home, href: "/dashboard?tab=home" },
+    { id: "courses", label: "Курсы", icon: BookOpen, href: "/dashboard?tab=courses" },
+    { id: "kruzhok", label: "Кружок", icon: Calendar, href: "/kruzhok" },
+    { id: "s7-tools", label: "S7 Tools", icon: Wrench, href: "/dashboard?tab=s7-tools" },
+    { id: "teams", label: "Команда", icon: Users, href: "/dashboard?tab=teams" },
+    { id: "profile", label: "Профиль", icon: User, href: "/dashboard?tab=profile" },
+    { id: "masterclass", label: "Мастер классы", icon: GraduationCap, href: "/dashboard?tab=masterclass" },
+    { id: "bytesize", label: "ByteSize", icon: FileText, href: "/dashboard?tab=bytesize" },
+    ...(user?.role === 'admin' ? [{ id: "admin", label: "Админ", icon: Shield, href: "/admin" }] as const : []),
   ]
 
   return (
@@ -115,10 +116,19 @@ export default function Sidebar({
                 <div
                   key={item.id}
                   onClick={() => {
-                    if (item.id === 'admin') {
-                      router.push('/admin')
-                    } else if (item.id === 'kruzhok') {
-                      router.push('/kruzhok')
+                    if (item.href?.startsWith("/dashboard?tab=")) {
+                      const tab = (() => {
+                        try {
+                          const url = new URL(item.href!, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+                          return url.searchParams.get('tab') || item.id
+                        } catch {
+                          return item.id
+                        }
+                      })()
+                      onTabChange(tab)
+                      router.push(item.href)
+                    } else if (item.href) {
+                      router.push(item.href)
                     } else {
                       onTabChange(item.id)
                     }
