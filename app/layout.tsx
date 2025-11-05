@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/components/auth/auth-context'
 import { Toaster } from '@/components/ui/toaster'
 import { ConfirmProvider } from '@/components/ui/confirm'
+import EntryToasts from '@/components/system/entry-toasts'
 import './globals.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 
@@ -68,6 +69,7 @@ export default function RootLayout({
               {children}
             </div>
             <Toaster />
+            <EntryToasts />
           </ConfirmProvider>
         </AuthProvider>
         <Analytics />

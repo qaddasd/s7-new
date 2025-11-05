@@ -57,7 +57,7 @@ export default function ProfileTab() {
     return (
       <div className="flex-1 p-4 md:p-8 animate-slide-up">
         <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
-          <div className="text-white text-center">Загрузка профиля...</div>
+          <div className="text-[var(--color-text-1)] text-center">Загрузка профиля...</div>
         </div>
       </div>
     )
@@ -67,7 +67,7 @@ export default function ProfileTab() {
       <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
         
         <div
-          className="bg-[#16161c] rounded-xl p-4 md:p-6 border border-[#636370]/20 animate-slide-up"
+          className="bg-[var(--color-surface-2)] rounded-xl p-4 md:p-6 border border-[var(--color-border-1)] animate-slide-up"
           style={{ animationDelay: "100ms" }}
         >
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -76,30 +76,30 @@ export default function ProfileTab() {
             </div>
             <div className="flex-1">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
-                <h2 className="text-white text-xl md:text-2xl font-medium">{user?.fullName || "Пользователь"}</h2>
+                <h2 className="text-[var(--color-text-1)] text-xl md:text-2xl font-medium">{user?.fullName || "Пользователь"}</h2>
                 <span className="bg-[#00a3ff] text-white px-3 py-1 rounded-full text-sm font-medium w-fit">
                   {user?.level ?? 1} Уровень
                 </span>
               </div>
-              <div className="text-[#a0a0b0] text-sm space-y-1">
+              <div className="text-[var(--color-text-3)] text-sm space-y-1">
                 <p>
-                  <span className="text-white">Почта:</span> {user?.email || 'Не указано'}
+                  <span className="text-[var(--color-text-1)]">Почта:</span> {user?.email || 'Не указано'}
                 </p>
                 <p>
-                  <span className="text-white">Учреждение:</span> {(user as any)?.educationalInstitution || (user as any)?.institution || 'Не указано'}
+                  <span className="text-[var(--color-text-1)]">Учреждение:</span> {(user as any)?.educationalInstitution || (user as any)?.institution || 'Не указано'}
                 </p>
                 {user?.primaryRole && (
                   <p>
-                    <span className="text-white">Роль:</span> {user.primaryRole}
+                    <span className="text-[var(--color-text-1)]">Роль:</span> {user.primaryRole}
                   </p>
                 )}
                 {typeof user?.age === 'number' && (
                   <p>
-                    <span className="text-white">Возраст:</span> {user?.age}
+                    <span className="text-[var(--color-text-1)]">Возраст:</span> {user?.age}
                   </p>
                 )}
                 <p>
-                  <span className="text-white">XP:</span> {user?.xp ?? 0}
+                  <span className="text-[var(--color-text-1)]">XP:</span> {user?.xp ?? 0}
                 </p>
               </div>
             </div>

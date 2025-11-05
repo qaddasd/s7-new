@@ -562,6 +562,7 @@ model CourseQuestion {
   options      Json     // array of strings
   correctIndex Int
   xpReward     Int      @default(100)
+  level        Int      @default(1)
   author       User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
   authorId     String?
   createdAt    DateTime @default(now())
@@ -577,6 +578,36 @@ model CourseAnswer {
   selectedIndex Int
   isCorrect    Boolean
   createdAt    DateTime @default(now())
+}
+
+// Daily Missions per course with per-user daily progress
+model DailyMission {
+  id        String   @id @default(cuid())
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  String
+  title     String
+  target    Int      @default(1)
+  xpReward  Int      @default(50)
+  type      String   @default("correct_answers") // correct_answers, lessons_completed, etc.
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  progresses DailyMissionProgress[]
+}
+
+model DailyMissionProgress {
+  id         String   @id @default(cuid())
+  mission    DailyMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  missionId  String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  day        DateTime
+  count      Int      @default(0)
+  completed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([missionId, userId, day])
 }
 
 // News/Announcements model

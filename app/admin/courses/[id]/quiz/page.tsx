@@ -16,6 +16,7 @@ interface Question {
   options: string[]
   moduleId?: string
   lessonId?: string
+  level?: number
 }
 
 export default function CourseQuizAdminPage() {
@@ -33,6 +34,7 @@ export default function CourseQuizAdminPage() {
   const [options, setOptions] = useState<string[]>(["", "", "", ""]) // 4 варианта по умолчанию
   const [correctIndex, setCorrectIndex] = useState<number>(0)
   const [xp, setXp] = useState<number>(100)
+  const [level, setLevel] = useState<number>(1)
 
   useEffect(() => {
     apiFetch<AdminCourse[]>("/api/admin/courses")
@@ -83,13 +85,14 @@ export default function CourseQuizAdminPage() {
       if (correctIndex < 0 || correctIndex >= clean.length) { toast({ title: "Укажите правильный ответ" }); return }
       await apiFetch(`/courses/${courseId}/questions`, {
         method: "POST",
-        body: JSON.stringify({ text: text.trim(), options: clean, correctIndex, xpReward: xp, moduleId: moduleId || undefined, lessonId: lessonId || undefined }),
+        body: JSON.stringify({ text: text.trim(), options: clean, correctIndex, xpReward: xp, level, moduleId: moduleId || undefined, lessonId: lessonId || undefined }),
       })
       toast({ title: "Вопрос создан" })
       setText("")
       setOptions(["", "", "", ""]) 
       setCorrectIndex(0)
       setXp(100)
+      setLevel(1)
       reload(courseId, moduleId, lessonId)
     } catch (e: any) {
       toast({ title: "Ошибка", description: e?.message || "Не удалось создать", variant: "destructive" as any })
@@ -137,6 +140,8 @@ export default function CourseQuizAdminPage() {
             <div className="ml-auto inline-flex items-center gap-2">
               <span className="text-white/70 text-sm">XP</span>
               <input type="number" min={0} max={10000} value={xp} onChange={(e)=>setXp(Number(e.target.value||0))} className="w-24 bg-[#0f0f14] border border-[#2a2a35] rounded-lg p-2 outline-none text-right" />
+              <span className="text-white/70 text-sm">Ур.</span>
+              <input type="number" min={1} max={10} value={level} onChange={(e)=>setLevel(Number(e.target.value||1))} className="w-20 bg-[#0f0f14] border border-[#2a2a35] rounded-lg p-2 outline-none text-right" />
             </div>
           </div>
         </div>
@@ -154,13 +159,17 @@ export default function CourseQuizAdminPage() {
         ) : (
           questions.map((q) => (
             <div key={q.id} className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white">
-              <div className="font-medium mb-2">{q.text}</div>
+              <div className="font-medium mb-1">{q.text}</div>
+              <div className="text-xs text-white/50 mb-2 flex items-center gap-3">
+                <span>Уровень: {q.level ?? 1}</span>
+                <span>moduleId: {q.moduleId || '—'}</span>
+                <span>lessonId: {q.lessonId || '—'}</span>
+              </div>
               <ul className="list-disc list-inside text-white/80 text-sm">
                 {q.options.map((o, i) => (
                   <li key={i}>{o}</li>
                 ))}
               </ul>
-              <div className="text-xs text-white/50 mt-2">moduleId: {q.moduleId || '—'}; lessonId: {q.lessonId || '—'}</div>
             </div>
           ))
         )}

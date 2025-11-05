@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import * as React from 'react'
 import * as ToastPrimitives from '@radix-ui/react-toast'
@@ -16,7 +16,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      'fixed bottom-4 right-4 z-[100] flex max-h-screen w-full max-w-sm flex-col gap-3 p-0',
+      'fixed top-4 right-4 z-[100] flex max-h-screen w-full max-w-sm flex-col items-end gap-3 p-0',
       className,
     )}
     {...props}
@@ -25,12 +25,12 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-xl border p-4 shadow-lg transition-all backdrop-blur-sm',
+  'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all backdrop-blur-[2px] animate-fade-in-up',
   {
     variants: {
       variant: {
-        default: 'border-[#22c55e]/30 bg-[#0c1b14]/95 text-white',
-        destructive: 'group border-[#ef4444]/40 bg-[#2a1414]/95 text-white',
+        default: 'border-[var(--color-border-1)] bg-[var(--color-surface-1)]/95 text-[var(--color-text-1)] ring-1 ring-[#00a3ff]/10',
+        destructive: 'group border-[#ef4444]/40 bg-[#2a1414]/95 text-white ring-1 ring-[#ef4444]/20',
       },
     },
     defaultVariants: {

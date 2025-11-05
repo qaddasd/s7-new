@@ -55,7 +55,17 @@ export default function CourseDetailsTab({
   const [showPayment, setShowPayment] = useState(false)
   const [canAccess, setCanAccess] = useState<boolean>(false)
   const [fullCourse, setFullCourse] = useState<CourseDetails | null>(course)
-  const [missions, setMissions] = useState<Array<{ id: string; text: string; xp?: number }>>([])
+  const [missions, setMissions] = useState<Array<{ id: string; title: string; target: number; progress: number; xpReward: number }>>([])
+  const [showGame, setShowGame] = useState(false)
+  const [gameLoading, setGameLoading] = useState(false)
+  const [gameQs, setGameQs] = useState<Array<{ id: string; text: string; options: string[]; xpReward?: number; level?: number }>>([])
+  const [qIndex, setQIndex] = useState(0)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const [answerInfo, setAnswerInfo] = useState<null | { correct: boolean; xpAwarded: number; correctIndex: number }>(null)
+  const [levelStart, setLevelStart] = useState<number | null>(null)
+  const [moduleFilterId, setModuleFilterId] = useState<string>("")
+  const [lessonFilterId, setLessonFilterId] = useState<string>("")
+  const [leaderboard, setLeaderboard] = useState<Array<{ rank: number; id: string; name: string; xp: number }>>([])
 
   const isFree = !course?.price || course.price === 0
 
@@ -94,15 +104,75 @@ export default function CourseDetailsTab({
   useEffect(() => {
     let ignore = false
     if (!course?.id) return
-    apiFetch<any[]>(`/courses/${course.id}/questions`)
+    apiFetch<any[]>(`/courses/${course.id}/missions`)
       .then((list) => {
         if (ignore) return
-        const items = (list || []).map((q: any) => ({ id: q.id, text: q.text, xp: q.xpReward || 100 }))
+        const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
         setMissions(items)
       })
       .catch(() => setMissions([]))
     return () => { ignore = true }
   }, [course?.id])
+
+  useEffect(() => {
+    let ignore = false
+    if (!course?.id) return
+    apiFetch<any[]>(`/courses/${course.id}/leaderboard`).then((rows)=>{
+      if (ignore) return
+      setLeaderboard((rows||[]).map((r:any)=>({ rank: r.rank, id: r.id, name: r.name, xp: Number(r.xp||0) })))
+    }).catch(()=>setLeaderboard([]))
+    return ()=>{ ignore = true }
+  }, [course?.id])
+
+  const openGame = async () => {
+    if (!course?.id) return
+    setShowGame(true)
+    setGameLoading(true)
+    setSelectedIdx(null)
+    setAnswerInfo(null)
+    setQIndex(0)
+    try {
+      const params = new URLSearchParams()
+      if (moduleFilterId) params.set('moduleId', moduleFilterId)
+      if (lessonFilterId) params.set('lessonId', lessonFilterId)
+      if (typeof levelStart === 'number') params.set('levelMin', String(levelStart))
+      const qsUrl = `/courses/${course.id}/questions${params.toString() ? `?${params.toString()}` : ''}`
+      const list = await apiFetch<any[]>(qsUrl)
+      const mapped = (list || []).map((q) => ({ id: q.id, text: q.text, options: q.options || [], xpReward: q.xpReward, level: q.level }))
+      setGameQs(mapped)
+    } catch {
+      setGameQs([])
+    } finally {
+      setGameLoading(false)
+    }
+  }
+
+  const submitAnswer = async () => {
+    if (selectedIdx === null || !gameQs[qIndex]) return
+    try {
+      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; xpAwarded: number }>(`/courses/questions/${gameQs[qIndex].id}/answer`, {
+        method: 'POST',
+        body: JSON.stringify({ selectedIndex: selectedIdx })
+      })
+      setAnswerInfo({ correct: res.isCorrect, correctIndex: res.correctIndex, xpAwarded: res.xpAwarded || 0 })
+      if (res.xpAwarded > 0) toast({ title: `+${res.xpAwarded} XP`, description: 'Ответ верный' })
+      // refresh missions progress after answer
+      if (course?.id) {
+        apiFetch<any[]>(`/courses/${course.id}/missions`).then((list)=>{
+          const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
+          setMissions(items)
+        }).catch(()=>{})
+      }
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответ', variant: 'destructive' as any })
+    }
+  }
+
+  const nextQuestion = () => {
+    setSelectedIdx(null)
+    setAnswerInfo(null)
+    setQIndex((i) => i + 1)
+  }
 
   const handlePurchase = () => {
     if (!user || !course) { toast({ title: "Войдите", description: "Войдите чтобы купить курс" }); return }
@@ -164,7 +234,7 @@ export default function CourseDetailsTab({
   const viewCourse = fullCourse || course
   const activeModule = viewCourse.modules.find((m) => String(m.id) === String(activeModuleId)) || viewCourse.modules[0]
   const xpTarget = useMemo(() => {
-    const sum = (missions || []).reduce((acc, m) => acc + (Number(m.xp || 0)), 0)
+    const sum = (missions || []).reduce((acc, m) => acc + (Number(m.xpReward || 0)), 0)
     return sum > 0 ? sum : 100
   }, [missions])
   const currentXp = Math.max(0, Number(user?.xp || 0))
@@ -192,7 +262,7 @@ export default function CourseDetailsTab({
                 >
                   <div className="text-center leading-tight">
                     <div className="text-sm">{i + 1}</div>
-                    <div className="text-[10px] text-[#00a3ff]">+{m.xp ?? 0}xp</div>
+                    <div className="text-[10px] text-[#00a3ff]">+{m.xpReward ?? 0}xp</div>
                   </div>
                 </div>
               ))}
@@ -206,33 +276,97 @@ export default function CourseDetailsTab({
               <div className="text-white/60 text-sm">Миссии пока не добавлены</div>
             ) : (
               <div className="space-y-3">
-                <div className="rounded-xl bg-[#0f0f14] border border-[#2a2a35] p-4">
-                  <div className="font-semibold mb-1 truncate">{missions[0].text}</div>
-                  <div className="text-white/60 text-xs mb-2">Миссия</div>
-                  <div className="h-2 w-full bg-[#1b1b22] rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00a3ff]" style={{ width: '40%' }} />
+                {missions.slice(0,3).map((m,i)=>{
+                  const pct = Math.min(100, Math.round((Number(m.progress)/Math.max(1, Number(m.target))) * 100))
+                  return (
+                    <div key={m.id} className="rounded-xl bg-[#0f0f14] border border-[#2a2a35] p-4">
+                      <div className="font-semibold mb-1 truncate">{m.title}</div>
+                      <div className="text-white/60 text-xs mb-2">Прогресс: {m.progress}/{m.target}</div>
+                      <div className="h-2 w-full bg-[#1b1b22] rounded-full overflow-hidden">
+                        <div className="h-full bg-[#00a3ff]" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="text-[#00a3ff] text-xs mt-2">+{m.xpReward}xp</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+      {showGame && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={() => setShowGame(false)}>
+          <div className="w-full max-w-2xl bg-[#16161c] border border-[#2a2a35] rounded-2xl p-6 text-white animate-slide-up" onClick={(e)=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-lg font-medium">Игровой режим</div>
+              <button onClick={() => setShowGame(false)} className="text-white/70 hover:text-white">Закрыть</button>
+            </div>
+            {gameLoading ? (
+              <div className="text-white/60">Загрузка...</div>
+            ) : gameQs.length === 0 ? (
+              <div>
+                <div className="text-white/60">Вопросов пока нет</div>
+                <div className="mt-4 text-right">
+                  <button onClick={()=>setShowGame(false)} className="rounded-lg bg-[#2a2a35] hover:bg-[#333344] px-4 py-2">Ок</button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-white/70">Вопрос {qIndex + 1} из {gameQs.length}</div>
+                  <div className="text-xs text-white/50 flex items-center gap-3">
+                    {typeof gameQs[qIndex].level === 'number' && <span className="rounded-full bg-[#0f0f14] border border-[#2a2a35] px-2 py-1">Уровень: {gameQs[qIndex].level}</span>}
+                    {typeof gameQs[qIndex].xpReward === 'number' && <span className="rounded-full bg-[#0f0f14] border border-[#2a2a35] px-2 py-1">+{gameQs[qIndex].xpReward} XP</span>}
                   </div>
-                  <div className="text-[#00a3ff] text-xs mt-2">+{missions[0].xp ?? 20}xp</div>
+                </div>
+                <div className="text-base font-medium">{gameQs[qIndex].text}</div>
+                <div className="grid grid-cols-1 gap-2">
+                  {gameQs[qIndex].options.map((opt, i) => {
+                    const isSelected = selectedIdx === i
+                    const isAnswered = !!answerInfo
+                    const isCorrect = isAnswered && i === (answerInfo?.correctIndex ?? -1)
+                    const isWrongSelection = isAnswered && isSelected && !isCorrect
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => !isAnswered && setSelectedIdx(i)}
+                        className={`text-left rounded-lg px-4 py-3 border transition ${
+                          isCorrect ? 'border-[#22c55e] bg-[#22c55e]/10' : isWrongSelection ? 'border-[#ef4444] bg-[#ef4444]/10' : isSelected ? 'border-[#00a3ff] bg-[#00a3ff]/10' : 'border-[#2a2a35] hover:bg-[#1b1b22]'
+                        }`}
+                        disabled={isAnswered}
+                      >
+                        {opt}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  {!answerInfo ? (
+                    <button onClick={submitAnswer} disabled={selectedIdx===null} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2 disabled:opacity-50">Ответить</button>
+                  ) : qIndex < gameQs.length - 1 ? (
+                    <button onClick={nextQuestion} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] text-white px-4 py-2">Далее</button>
+                  ) : (
+                    <button onClick={()=>setShowGame(false)} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2">Завершить</button>
+                  )}
                 </div>
               </div>
             )}
+          </div>
+        </div>,
+        document.body
+      )}
             {user?.role === 'admin' && (
               <button
                 onClick={() => {
                   if (!course?.id) return
-                  const text = prompt('Текст миссии (вопрос)?') || ''
-                  const optA = prompt('Вариант A') || 'A'
-                  const optB = prompt('Вариант B') || 'B'
-                  const xp = Number(prompt('XP (по умолчанию 100)') || '100')
-                  apiFetch(`/courses/${course.id}/questions`, {
+                  const title = prompt('Название ежедневной миссии? (например: Ответь правильно 5 раз сегодня)') || 'Ежедневная миссия'
+                  const target = Number(prompt('Цель (кол-во):', '5') || '5')
+                  const xp = Number(prompt('XP за выполнение (по умолчанию 100):', '100') || '100')
+                  apiFetch(`/courses/${course.id}/missions`, {
                     method: 'POST',
-                    body: JSON.stringify({ text, options: [optA, optB], correctIndex: 0, xpReward: xp })
-                  }).then(() => {
-                    return apiFetch<any[]>(`/courses/${course.id}/questions`)
-                  }).then((list) => {
-                    const items = (list || []).slice(0, 5).map((q: any) => ({ id: q.id, text: q.text, xp: q.xpReward || 20 }))
-                    setMissions(items)
-                  })
+                    body: JSON.stringify({ title, target, xpReward: xp })
+                  }).then(() => apiFetch<any[]>(`/courses/${course.id}/missions`))
+                    .then((list) => {
+                      const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
+                      setMissions(items)
+                    })
                 }}
                 className="mt-4 w-full rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium py-2"
               >
@@ -298,6 +432,40 @@ export default function CourseDetailsTab({
             )}
           </div>
 
+          {canAccess && (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
+                  <div className="text-white/60 text-xs mb-1">Уровень от</div>
+                  <select value={String(levelStart ?? '')} onChange={(e)=> setLevelStart(e.target.value? Number(e.target.value): null)} className="w-full bg-transparent text-white text-sm outline-none">
+                    <option value="" className="bg-[#0f0f14]">Все уровни</option>
+                    {Array.from({length:10}).map((_,i)=> <option key={i+1} value={i+1} className="bg-[#0f0f14]">{i+1}</option>)}
+                  </select>
+                </div>
+                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
+                  <div className="text-white/60 text-xs mb-1">Модуль</div>
+                  <select value={moduleFilterId} onChange={(e)=>{ setModuleFilterId(e.target.value); setLessonFilterId('') }} className="w-full bg-transparent text-white text-sm outline-none">
+                    <option value="" className="bg-[#0f0f14]">Все модули</option>
+                    {viewCourse.modules.map((m)=> <option key={m.id} value={String(m.id)} className="bg-[#0f0f14]">{m.title}</option>)}
+                  </select>
+                </div>
+                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
+                  <div className="text-white/60 text-xs mb-1">Урок</div>
+                  <select value={lessonFilterId} onChange={(e)=> setLessonFilterId(e.target.value)} disabled={!moduleFilterId} className="w-full bg-transparent text-white text-sm outline-none disabled:opacity-50">
+                    <option value="" className="bg-[#0f0f14]">Все уроки</option>
+                    {(moduleFilterId ? (viewCourse.modules.find((m)=> String(m.id)===String(moduleFilterId))?.lessons||[]) : []).map((l)=> <option key={l.id} value={String(l.id)} className="bg-[#0f0f14]">{l.title}</option>)}
+                  </select>
+                </div>
+              </div>
+              <button
+                onClick={openGame}
+                className="w-full rounded-full h-12 bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold"
+              >
+                Игра
+              </button>
+            </div>
+          )}
+
           
           <div className="space-y-3">
             {viewCourse.modules.map((mod, modIdx) => (
@@ -333,6 +501,26 @@ export default function CourseDetailsTab({
             </div>
           </div>
 
+          <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 text-white">
+            <div className="text-white/80 text-sm mb-2">Лидерборд</div>
+            {leaderboard.length === 0 ? (
+              <div className="text-white/60 text-sm">Нет данных</div>
+            ) : (
+              <div className="space-y-2">
+                {leaderboard.slice(0,5).map((u)=> (
+                  <div key={u.id} className="flex items-center justify-between bg-[#0f0f14] border border-[#2a2a35] rounded-full px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-[#00a3ff] text-black text-xs font-bold flex items-center justify-center">{u.rank}</div>
+                      <div className="text-sm">{u.name}</div>
+                    </div>
+                    <div className="text-[#00a3ff] text-xs">{u.xp} XP</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        
           <div className="space-y-3">
             {activeModule?.lessons.map((lesson, lesIdx) => (
               <button

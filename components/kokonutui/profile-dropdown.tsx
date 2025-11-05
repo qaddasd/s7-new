@@ -48,20 +48,20 @@ export default function ProfileDropdown({
                     <DropdownMenuTrigger asChild>
                         <button
                             type="button"
-                            className="flex items-center gap-4 p-3 rounded-2xl bg-[#16161c] border border-[#2a2a35] hover:bg-[#1b1b22] transition-all duration-200 focus:outline-none text-white"
+                            className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-border-1)] hover:bg-[var(--color-surface-3)] transition-all duration-[var(--dur-fast)] focus:outline-none text-[var(--color-text-1)]"
                         >
                             <div className="text-left flex-1">
                                 <div className="text-sm font-medium tracking-tight leading-tight">
                                     {data.name}
                                 </div>
-                                <div className="text-xs text-white/60 tracking-tight leading-tight">{data.email}</div>
+                                <div className="text-xs text-[var(--color-text-3)] tracking-tight leading-tight">{data.email}</div>
                                 {typeof data.xp === 'number' && (
                                   <div className="mt-1 text-[11px] text-[#00a3ff]">XP: {data.xp}</div>
                                 )}
                             </div>
                             <div className="relative">
-                              <div className="w-10 h-10 rounded-full ring-2 ring-[#00a3ff]/40 ring-offset-2 ring-offset-[#16161c] bg-[#0f0f14] flex items-center justify-center">
-                                <User className="w-5 h-5 text-white/70" />
+                              <div className="w-10 h-10 rounded-full ring-2 ring-[#00a3ff]/40 ring-offset-2 ring-offset-[var(--color-surface-2)] bg-[var(--color-surface-1)] flex items-center justify-center">
+                                <User className="w-5 h-5 text-[var(--color-text-3)]" />
                               </div>
                             </div>
                         </button>
@@ -69,13 +69,13 @@ export default function ProfileDropdown({
                     <DropdownMenuContent
                         align="end"
                         sideOffset={4}
-                        className="w-64 p-2 bg-[#16161c] border border-[#2a2a35] rounded-2xl shadow-lg text-white origin-top-right"
+                        className="w-64 p-2 bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl shadow-lg text-[var(--color-text-1)] origin-top-right"
                     >
                         <div className="px-2 pb-2">
                           <div className="text-sm font-medium">{data.name}</div>
-                          <div className="text-xs text-white/60">{data.email}</div>
+                          <div className="text-xs text-[var(--color-text-3)]">{data.email}</div>
                           {typeof data.xp === 'number' && (
-                            <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-[#0f0f14] border border-[#2a2a35] px-2 py-0.5 text-[11px] text-[#00a3ff]">XP: {data.xp}</div>
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-[var(--color-surface-1)] border border-[var(--color-border-1)] px-2 py-0.5 text-[11px] text-[#00a3ff]">XP: {data.xp}</div>
                           )}
                         </div>
                         {menuItems.length > 0 && (
@@ -84,13 +84,13 @@ export default function ProfileDropdown({
                           </div>
                         )}
 
-                        <DropdownMenuSeparator className="my-3 bg-[#2a2a35]" />
+                        <DropdownMenuSeparator className="my-3 bg-[var(--color-border-1)]" />
 
                         <DropdownMenuItem asChild>
                             <button
                                 type="button"
                                 onClick={onLogout}
-                                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[#1b1b22] cursor-pointer transition-colors"
+                                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--color-surface-3)] cursor-pointer transition-colors duration-[var(--dur-fast)]"
                             >
                                 <LogOut className="w-4 h-4 text-red-400" />
                                 <span className="text-sm font-medium text-red-400">Выйти</span>

@@ -290,7 +290,7 @@ export default function Page() {
     if (!ok) return
     setModules((prev) => prev.filter((m) => m.id !== id))
     try { 
-      toast({ title: 'Модуль удалён', description: 'Модуль успешно удалён из курса.' } as any) 
+      toast({ title: 'Модуль удалён', description: 'Модуль успешно удалён из курса' }) 
     } catch {}
   }
 
@@ -568,7 +568,7 @@ export default function Page() {
       localStorage.removeItem(draftKey)
     } catch {}
 
-    toast({ title: "Курс сохранён" } as any)
+    toast({ title: "Курс успешно создан", description: "Курс был успешно опубликован и доступен для студентов" })
     router.push("/admin/courses")
   }
 
@@ -637,7 +637,7 @@ export default function Page() {
                     localStorage.setItem('s7_admin_courses', JSON.stringify(next))
                     localStorage.removeItem('s7_admin_course_draft')
                   } catch {}
-                  toast({ title: 'Курс удалён' } as any)
+                  toast({ title: 'Курс успешно удалён', description: 'Курс был удалён из системы' })
                   router.push('/admin/courses')
                 } catch (e: any) {
                   toast({ title: 'Ошибка', description: e?.message || 'Не удалось удалить', variant: 'destructive' as any })
@@ -725,7 +725,7 @@ export default function Page() {
                 }
                 if (draftKey) localStorage.setItem(draftKey, JSON.stringify(draft))
                 localStorage.setItem("s7_admin_course_draft", JSON.stringify(draft))
-                toast({ title: 'Черновик сохранён' } as any)
+                toast({ title: 'Черновик сохранён', description: 'Ваши изменения сохранены в черновике' })
               } catch {}
             }}
             className="rounded-2xl bg-[var(--color-border-2)] hover:bg-[var(--color-border-hover-1)] text-[var(--color-text-1)] font-medium py-4 transition-colors"

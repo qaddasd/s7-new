@@ -105,11 +105,11 @@ export default function CoursesTab({
     <main className="flex-1 p-8 overflow-y-auto animate-slide-up">
       
       <section className="mb-12">
-        <h2 className="text-white text-xl font-medium mb-6">Продолжить</h2>
+        <h2 className="text-[var(--color-text-1)] text-xl font-medium mb-6">Продолжить</h2>
         {loadingContinue ? (
-          <div className="text-white/70">Загрузка...</div>
+          <div className="text-[var(--color-text-3)]">Загрузка...</div>
         ) : continueCourses.length === 0 ? (
-          <div className="text-white/60 text-sm">Нет курсов для продолжения</div>
+          <div className="text-[var(--color-text-3)] text-sm">Нет курсов для продолжения</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {continueCourses.map((c, i) => (
@@ -141,14 +141,14 @@ export default function CoursesTab({
       
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white text-xl font-medium">Рекомендованные курсы</h2>
+          <h2 className="text-[var(--color-text-1)] text-xl font-medium">Рекомендованные курсы</h2>
           <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a0a0b0] w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-3)] w-4 h-4" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Поиск"
-              className="w-full bg-[#16161c] border border-[#636370]/20 rounded-lg pl-9 pr-3 py-2 text-white placeholder-[#a0a0b0] focus:outline-none focus:border-[#00a3ff]"
+              className="w-full bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-lg pl-9 pr-3 py-2 text-[var(--color-text-1)] placeholder-[var(--color-text-3)] focus:outline-none focus:border-[#00a3ff]"
             />
           </div>
         </div>
@@ -162,8 +162,8 @@ export default function CoursesTab({
             <button
               key={f.id}
               onClick={() => setFilter(f.id as any)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === f.id ? "bg-[#00a3ff] text-white" : "bg-[#16161c] text-[#a0a0b0] hover:text-white hover:bg-[#636370]/10"
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-[var(--dur-fast)] ${
+                filter === f.id ? "bg-[#00a3ff] text-white" : "bg-[var(--color-surface-2)] text-[var(--color-text-3)] hover:text-[var(--color-text-1)] hover:bg-[var(--color-surface-3)]"
               }`}
             >
               {f.label}
@@ -171,9 +171,9 @@ export default function CoursesTab({
           ))}
         </div>
 
-        <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 mb-6 max-w-md">
-          <div className="text-white text-sm font-medium mb-2">Price Range</div>
-          <div className="text-white/60 text-xs mb-3">Укажите бюджет ({priceRange[0].toLocaleString()}₸ – {priceRange[1].toLocaleString()}₸)</div>
+        <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-4 mb-6 max-w-md">
+          <div className="text-[var(--color-text-1)] text-sm font-medium mb-2">Price Range</div>
+          <div className="text-[var(--color-text-3)] text-xs mb-3">Укажите бюджет ({priceRange[0].toLocaleString()}₸ – {priceRange[1].toLocaleString()}₸)</div>
           <div className="px-1 space-y-3">
             <Slider
               min={MIN_PRICE}
@@ -195,7 +195,7 @@ export default function CoursesTab({
                   const n = Math.max(MIN_PRICE, Math.min(Number(e.target.value||0), priceRange[1]))
                   setPriceRange([n, priceRange[1]])
                 }}
-                className="bg-[#0f0f14] border-[#2a2a35] text-white"
+                className="bg-[var(--color-surface-1)] border-[var(--color-border-2)] text-[var(--color-text-1)]"
               />
               <Input
                 type="number"
@@ -207,16 +207,16 @@ export default function CoursesTab({
                   const n = Math.min(MAX_PRICE, Math.max(Number(e.target.value||0), priceRange[0]))
                   setPriceRange([priceRange[0], n])
                 }}
-                className="bg-[#0f0f14] border-[#2a2a35] text-white"
+                className="bg-[var(--color-surface-1)] border-[var(--color-border-2)] text-[var(--color-text-1)]"
               />
             </div>
           </div>
         </div>
 
         {loadingRecommended ? (
-          <div className="text-white/70">Загрузка...</div>
+          <div className="text-[var(--color-text-3)]">Загрузка...</div>
         ) : recommended.length === 0 ? (
-          <div className="text-center text-white/70 bg-[#16161c] border border-[#636370]/20 rounded-2xl p-10">Курсы не найдены</div>
+          <div className="text-center text-[var(--color-text-3)] bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-10">Курсы не найдены</div>
         ) : (
           <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -226,16 +226,16 @@ export default function CoursesTab({
                 onClick={() => onOpenCourse?.(c)}
                 role="link"
                 tabIndex={0}
-                className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-6 hover:border-[#636370]/40 transition-all duration-300 cursor-pointer group hover:scale-102 animate-slide-up"
+                className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-6 hover:border-[var(--color-border-hover-1)] transition-all duration-[var(--dur-mid)] cursor-pointer group hover:scale-102 animate-slide-up"
                 style={{ animationDelay: `${200 + i * 50}ms` }}
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-white text-lg font-medium mb-2">{c.title}</h3>
+                    <h3 className="text-[var(--color-text-1)] text-lg font-medium mb-2">{c.title}</h3>
                   </div>
-                  <ArrowUpRight className="w-6 h-6 text-[#a0a0b0] group-hover:text-white transition-colors duration-300" />
+                  <ArrowUpRight className="w-6 h-6 text-[var(--color-text-3)] group-hover:text-[var(--color-text-1)] transition-colors duration-[var(--dur-mid)]" />
                 </div>
-                <div className="text-[#a0a0b0] text-sm space-y-1">
+                <div className="text-[var(--color-text-3)] text-sm space-y-1">
                   <div>Автор: {c.author}</div>
                   <div>Уроков: {(c.modules || []).reduce((acc, m) => acc + (m.lessons?.length || 0), 0)}</div>
                   <div>Стоимость: {c.price && c.price > 0 ? `${c.price.toLocaleString()}₸` : "0₸"}</div>

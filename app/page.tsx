@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth/auth-context"
 import { toast } from "@/hooks/use-toast"
 import { EmailVerification } from "@/components/auth/email-verification"
 import { RegisterVerification } from "@/components/auth/register-verification"
-import { setTokens } from "@/lib/api"
+import { setTokens, apiFetch } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -39,29 +39,27 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch("/api/auth/login", {
+      const data = await apiFetch<any>("/auth/login", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password })
       })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Ошибка входа")
+      // success: persist tokens and reload dashboard
+      setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken })
+      if (typeof window !== 'undefined') {
+        try { sessionStorage.setItem('justLoggedIn', '1') } catch {}
       }
-      
-      if (data.requiresEmailVerification) {
-        setRequiresEmailVerification(true)
-        setVerificationEmail(data.email)
-      } else {
-        // Direct login (for dev mode)
-        await login(email.trim(), password)
-        toast({ title: "Вход выполнен", description: "Добро пожаловать!" })
-        router.push("/dashboard")
-      }
+      window.location.assign("/dashboard")
     } catch (e: any) {
-      toast({ title: "Ошибка входа", description: e?.message || "Проверьте почту и пароль", variant: "destructive" as any })
+      const msg = String(e?.message || "")
+      if (/подтвержд/i.test(msg)) {
+        // email not verified -> open verification flow and send code
+        try { await apiFetch("/auth/send-verification", { method: "POST", body: JSON.stringify({ email: email.trim() }) }) } catch {}
+        setVerificationEmail(email.trim())
+        setRequiresEmailVerification(true)
+        toast({ title: "Подтверждение почты", description: "Мы отправили код на вашу почту" })
+        return
+      }
+      toast({ title: "Ошибка входа", description: msg || "Проверьте почту и пароль", variant: "destructive" as any })
     }
   }
 
@@ -115,11 +113,17 @@ export default function LoginPage() {
     // Persist tokens using shared helper so AuthProvider can read them
     setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken })
     // Full reload to ensure AuthProvider re-initializes user
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem('justLoggedIn', '1') } catch {}
+    }
     window.location.assign("/dashboard")
   }
 
   const handleRegisterVerificationSuccess = async (data: any) => {
     setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken })
+    if (typeof window !== 'undefined') {
+      try { sessionStorage.setItem('justLoggedIn', '1') } catch {}
+    }
     window.location.assign("/dashboard")
   }
 
@@ -321,15 +325,17 @@ export default function LoginPage() {
               />
               <i className="bi bi-envelope absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
             </div>
-            <div className="relative animate-slide-up" style={{ animationDelay: "800ms" }}>
-              <Input
-                type="password"
-                placeholder="Пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-transparent h-auto py-3 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
-              />
-              <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
+            <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isForgot ? "max-h-0 opacity-0 -translate-y-4" : "max-h-24 opacity-100 translate-y-0"}`}>
+              <div className="relative animate-slide-up" style={{ animationDelay: "800ms" }}>
+                <Input
+                  type="password"
+                  placeholder="Пароль"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-transparent h-auto py-3 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                />
+                <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
+              </div>
             </div>
 
             {isLogin && isForgot && (

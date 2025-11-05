@@ -71,12 +71,12 @@ export default function Sidebar({
       )}
 
       <div
-        className={`sidebar-container bg-[#0b0b0b] border-r border-[#1f1f1f] flex flex-col transition-all duration-300 ease-in-out
+        className={`sidebar-container bg-[var(--color-surface-1)] border-r border-[var(--color-border-1)] flex flex-col transition-all duration-[var(--dur-mid)] ease-[var(--easing)]
         ${isCollapsed ? "w-16" : "w-64"}
         ${isMobileMenuOpen ? "fixed inset-y-0 left-0 z-50 w-64 animate-slide-in-left" : "hidden md:flex md:fixed md:inset-y-0 md:left-0 md:z-30"}`}
       >
         <div
-          className={`${isCollapsed ? "p-3" : "p-6"} border-b border-[#1f1f1f] flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}
+          className={`${isCollapsed ? "p-3" : "p-6"} border-b border-[var(--color-border-1)] flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}
         >
           <Image
             src="/logo-s7.png"
@@ -88,7 +88,7 @@ export default function Sidebar({
           {!isCollapsed && (
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-[#a7a7a7] hover:text-white transition-colors duration-200 hover:bg-[#141414] rounded-lg p-1 hidden md:block"
+              className="text-[var(--color-text-3)] hover:text-[var(--color-text-1)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--color-surface-2)] rounded-lg p-1 hidden md:block"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -96,10 +96,10 @@ export default function Sidebar({
         </div>
 
         {isCollapsed && (
-          <div className="p-2 border-b border-[#1f1f1f] hidden md:block">
+          <div className="p-2 border-b border-[var(--color-border-1)] hidden md:block">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="w-full text-[#a7a7a7] hover:text-white transition-colors duration-200 hover:bg-[#141414] rounded-lg p-2 flex justify-center"
+              className="w-full text-[var(--color-text-3)] hover:text-[var(--color-text-1)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--color-surface-2)] rounded-lg p-2 flex justify-center"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -134,10 +134,10 @@ export default function Sidebar({
                     }
                     setIsMobileMenuOpen(false)
                   }}
-                  className={`group relative flex items-center ${isCollapsed ? "justify-center p-3" : "space-x-3 px-4 py-3"} rounded-lg transition-all duration-200 cursor-pointer animate-slide-up ${
+                  className={`group relative flex items-center ${isCollapsed ? "justify-center p-3" : "space-x-3 px-4 py-3"} rounded-lg transition-all duration-[var(--dur-fast)] cursor-pointer animate-slide-up ${
                     isActive
-                      ? "bg-[#141414] border border-[#2a2a2a] text-white"
-                      : "text-[#a7a7a7] hover:text-white hover:bg-[#141414]"
+                      ? "bg-[var(--color-surface-2)] border border-[var(--color-border-hover-1)] text-[var(--color-text-1)]"
+                      : "text-[var(--color-text-3)] hover:text-[var(--color-text-1)] hover:bg-[var(--color-surface-2)]"
                   }`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
@@ -157,7 +157,7 @@ export default function Sidebar({
                   )}
 
                   {isCollapsed && !isMobileMenuOpen && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-[#141414] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                    <div className="absolute left-full ml-2 px-2 py-1 bg-[var(--color-surface-2)] text-[var(--color-text-1)] text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-[var(--dur-fast)] pointer-events-none whitespace-nowrap z-50">
                       {item.label}
                     </div>
                   )}
@@ -166,18 +166,18 @@ export default function Sidebar({
             })}
           </div>
         </nav>
-        <div className="p-2 border-t border-[#1f1f1f] space-y-1">
+        <div className="p-2 border-t border-[var(--color-border-1)] space-y-1">
           {user?.role === 'admin' && (
             <div
               onClick={() => router.push('/admin')}
-              className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-200 cursor-pointer text-[#a7a7a7] hover:text-white hover:bg-[#141414]"
+              className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-[var(--dur-fast)] cursor-pointer text-[var(--color-text-3)] hover:text-[var(--color-text-1)] hover:bg-[var(--color-surface-2)]"
             >
-              <Shield className="w-5 h-5 transition-transform duration-200 group-hover:scale-105" />
+              <Shield className="w-5 h-5 transition-transform duration-[var(--dur-fast)] group-hover:scale-105" />
               {!isCollapsed && (
                 <span className="text-sm ml-3">Админ панель</span>
               )}
               {isCollapsed && (
-                <div className="absolute left-full ml-2 px-2 py-1 bg-[#141414] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                <div className="absolute left-full ml-2 px-2 py-1 bg-[var(--color-surface-2)] text-[var(--color-text-1)] text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-[var(--dur-fast)] pointer-events-none whitespace-nowrap z-50">
                   Админ панель
                 </div>
               )}
@@ -185,14 +185,14 @@ export default function Sidebar({
           )}
           <div
             onClick={handleLogout}
-            className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-200 cursor-pointer text-[#ff4757] hover:text-white hover:bg-[#141414]"
+            className="group relative flex items-center justify-center p-3 rounded-lg transition-all duration-[var(--dur-fast)] cursor-pointer text-[#ef4444] hover:text-white hover:bg-[var(--color-surface-2)]"
           >
-            <LogOut className="w-5 h-5 transition-transform duration-200 group-hover:scale-105" />
+            <LogOut className="w-5 h-5 transition-transform duration-[var(--dur-fast)] group-hover:scale-105" />
             {!isCollapsed && (
               <span className="text-sm ml-3">Выйти</span>
             )}
             {isCollapsed && (
-              <div className="absolute left-full ml-2 px-2 py-1 bg-[#141414] text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+              <div className="absolute left-full ml-2 px-2 py-1 bg-[var(--color-surface-2)] text-[var(--color-text-1)] text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-[var(--dur-fast)] pointer-events-none whitespace-nowrap z-50">
                 Выйти
               </div>
             )}

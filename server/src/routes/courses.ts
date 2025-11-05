@@ -1,4 +1,4 @@
-﻿function toApiMedia(u?: string | null): string | undefined {
+function toApiMedia(u?: string | null): string | undefined {
   try {
     if (!u) return undefined
     const s = String(u)
@@ -51,6 +51,7 @@ const questionSchema = z.object({
   options: z.array(z.string().min(1)).min(2).max(8),
   correctIndex: z.number().int().min(0),
   xpReward: z.number().int().min(0).max(10000).optional().default(100),
+  level: z.number().int().min(1).max(10).optional().default(1),
   moduleId: z.string().optional(),
   lessonId: z.string().optional(),
 })
@@ -72,6 +73,7 @@ router.post("/:courseId/questions", requireAuth, async (req: AuthenticatedReques
       options: data.options as any,
       correctIndex: data.correctIndex,
       xpReward: data.xpReward ?? 100,
+      level: data.level ?? 1,
       authorId: req.user!.id,
     },
   })
@@ -89,11 +91,16 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   }
 
   const { moduleId, lessonId } = req.query as any
+  const level = (req.query.level as string | undefined) || undefined
+  const levelMin = (req.query.levelMin as string | undefined) || undefined
+  const levelMax = (req.query.levelMax as string | undefined) || undefined
   const where: any = { courseId }
   if (moduleId) where.moduleId = moduleId
   if (lessonId) where.lessonId = lessonId
+  if (level) where.level = Number(level)
+  if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
-  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId })))
+  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level })))
 })
 
 router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -109,9 +116,104 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   if (isCorrect) {
     awarded = Number(q.xpReward ?? 100)
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
+    // increment daily missions progress for this course (type: correct_answers)
+    try {
+      await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
+    } catch {}
   }
   res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded })
 })
+
+// Daily missions
+const missionSchema = z.object({
+  title: z.string().min(1),
+  target: z.number().int().min(1).max(1000).default(1),
+  xpReward: z.number().int().min(0).max(100000).default(50),
+  type: z.string().optional().default("correct_answers"),
+  active: z.boolean().optional().default(true),
+})
+
+router.get("/:courseId/missions", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId } = req.params
+  const list = await (prisma as any).dailyMission.findMany({ where: { courseId, active: true }, orderBy: { createdAt: "asc" } })
+  let result = list.map((m: any) => ({ id: m.id, title: m.title, target: m.target, xpReward: m.xpReward, type: m.type, progress: 0, completed: false }))
+  if (req.user?.id) {
+    const day = startOfDay(new Date())
+    const prog = await (prisma as any).dailyMissionProgress.findMany({ where: { missionId: { in: list.map((m: any) => m.id) }, userId: req.user!.id, day } })
+    const map = new Map<string, any>(prog.map((p: any) => [String(p.missionId), p] as [string, any]))
+    result = result.map((r: any) => {
+      const p = map.get(String(r.id)) as any
+      return { ...r, progress: p?.count ?? 0, completed: Boolean(p?.completed) }
+    })
+  }
+  res.json(result)
+})
+
+router.post("/:courseId/missions", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })
+  const { courseId } = req.params
+  const parsed = missionSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const course = await prisma.course.findUnique({ where: { id: courseId }, select: { id: true } })
+  if (!course) return res.status(404).json({ error: "Course not found" })
+  const m = await (prisma as any).dailyMission.create({ data: { courseId, title: parsed.data.title, target: parsed.data.target, xpReward: parsed.data.xpReward, type: parsed.data.type, active: parsed.data.active } })
+  res.status(201).json(m)
+})
+
+router.post("/missions/:missionId/progress", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { missionId } = req.params
+  const { delta } = z.object({ delta: z.number().int().min(1).default(1) }).parse(req.body)
+  const m = await (prisma as any).dailyMission.findUnique({ where: { id: missionId } })
+  if (!m || !m.active) return res.status(404).json({ error: "Mission not found" })
+  const day = startOfDay(new Date())
+  let p = await (prisma as any).dailyMissionProgress.findFirst({ where: { missionId, userId: req.user!.id, day } })
+  if (!p) {
+    p = await (prisma as any).dailyMissionProgress.create({ data: { missionId, userId: req.user!.id, day, count: 0, completed: false } })
+  }
+  if (p.completed) return res.json({ ...p, awarded: 0 })
+  const newCount = (p.count || 0) + delta
+  const willComplete = newCount >= m.target
+  p = await (prisma as any).dailyMissionProgress.update({ where: { id: p.id }, data: { count: newCount, completed: willComplete, updatedAt: new Date() } })
+  let awarded = 0
+  if (willComplete) {
+    awarded = Number(m.xpReward || 0)
+    if (awarded > 0) await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
+  }
+  res.json({ ...p, awarded })
+})
+
+router.get("/:courseId/leaderboard", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId } = req.params
+  const enrollments = await prisma.enrollment.findMany({ where: { courseId }, include: { user: { select: { id: true, fullName: true, email: true, experiencePoints: true } } } })
+  const users = enrollments.map((e) => e.user).filter(Boolean) as any[]
+  const uniq = new Map<string, any>()
+  for (const u of users) { if (!uniq.has(u.id)) uniq.set(u.id, u) }
+  const top = Array.from(uniq.values()).sort((a, b) => Number(b.experiencePoints) - Number(a.experiencePoints)).slice(0, 10)
+  res.json(top.map((u, i) => ({ rank: i + 1, id: u.id, name: u.fullName || u.email, xp: Number(u.experiencePoints || 0) })))
+})
+
+function startOfDay(d: Date) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+async function incrementDailyMissionsProgressForCourse({ courseId, userId, delta }: { courseId: string; userId: string; delta: number }) {
+  const missions = await (prisma as any).dailyMission.findMany({ where: { courseId, active: true, type: "correct_answers" } })
+  if ((missions || []).length === 0) return
+  const day = startOfDay(new Date())
+  for (const m of missions) {
+    let p = await (prisma as any).dailyMissionProgress.findFirst({ where: { missionId: m.id, userId, day } })
+    if (!p) p = await (prisma as any).dailyMissionProgress.create({ data: { missionId: m.id, userId, day, count: 0, completed: false } })
+    if (p.completed) continue
+    const newCount = (p.count || 0) + delta
+    const willComplete = newCount >= m.target
+    await (prisma as any).dailyMissionProgress.update({ where: { id: p.id }, data: { count: newCount, completed: willComplete, updatedAt: new Date() } })
+    if (willComplete && Number(m.xpReward || 0) > 0) {
+      await prisma.user.update({ where: { id: userId }, data: { experiencePoints: { increment: Number(m.xpReward || 0) } } })
+    }
+  }
+}
 
 router.get("/:courseId/questions/analytics", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   if (req.user?.role !== "ADMIN") return res.status(403).json({ error: "Admin only" })

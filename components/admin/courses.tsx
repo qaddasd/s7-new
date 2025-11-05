@@ -25,23 +25,23 @@ const generateDraftId = () => {
 function CourseCard({ id, title, level, price, lessonsCount, onDeleted }: { id: string; title: string; level: string; price: number; lessonsCount: number; onDeleted: (id: string) => void }) {
   const confirm = useConfirm()
   return (
-    <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-6 text-white relative">
-      <div className="absolute top-4 right-4 text-white/70">
+    <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-6 text-[var(--color-text-1)] relative hover:border-[var(--color-border-hover-1)] transition-all duration-[var(--dur-mid)]">
+      <div className="absolute top-4 right-4 text-[var(--color-text-3)]">
         <ArrowUpRight className="w-6 h-6" />
       </div>
-      <div className="text-white text-lg font-medium mb-2">{title}</div>
+      <div className="text-[var(--color-text-1)] text-lg font-medium mb-2">{title}</div>
       <span className="inline-block bg-[#22c55e] text-black text-xs font-medium px-3 py-1 rounded-full mb-4">
         {level}
       </span>
-      <div className="text-[#a0a0b0] text-sm space-y-1">
+      <div className="text-[var(--color-text-3)] text-sm space-y-1">
         <div>Уроков: {lessonsCount}</div>
         <div>Стоимость: {price > 0 ? `${Number(price).toLocaleString()}₸` : '0₸'}</div>
       </div>
       <div className="absolute bottom-4 left-4 flex items-center gap-2">
-        <Link href={`/admin/courses/${encodeURIComponent(id)}/quiz`} className="text-xs bg-[#2a2a35] text-white/80 rounded-full px-3 py-1 hover:bg-[#333344]">
+        <Link href={`/admin/courses/${encodeURIComponent(id)}/quiz`} className="text-xs bg-[var(--color-surface-3)] text-[var(--color-text-2)] rounded-full px-3 py-1 hover:bg-[var(--color-border-hover-1)] transition-colors duration-[var(--dur-fast)]">
           Вопросы
         </Link>
-        <Link href={`/admin/courses/${encodeURIComponent(id)}/analytics`} className="text-xs bg-[#2a2a35] text-white/80 rounded-full px-3 py-1 hover:bg-[#333344]">
+        <Link href={`/admin/courses/${encodeURIComponent(id)}/analytics`} className="text-xs bg-[var(--color-surface-3)] text-[var(--color-text-2)] rounded-full px-3 py-1 hover:bg-[var(--color-border-hover-1)] transition-colors duration-[var(--dur-fast)]">
           Аналитика
         </Link>
         <button
@@ -56,7 +56,7 @@ function CourseCard({ id, title, level, price, lessonsCount, onDeleted }: { id: 
             if (!ok) return
             try {
               await apiFetch(`/api/admin/courses/${id}`, { method: 'DELETE' })
-              toast({ title: 'Курс удалён', description: 'Курс успешно удалён.' } as any)
+              toast({ title: 'Курс успешно удалён', description: 'Курс был удалён из системы' })
               onDeleted(id)
             } catch (e: any) {
               toast({ title: 'Ошибка', description: e?.message || 'Не удалось удалить курс. Попробуйте позже.', variant: 'destructive' as any })
@@ -69,7 +69,7 @@ function CourseCard({ id, title, level, price, lessonsCount, onDeleted }: { id: 
       </div>
       <Link
         href={`/admin/courses/new?edit=${encodeURIComponent(id)}`}
-        className="absolute bottom-4 right-4 text-xs bg-[#2a2a35] text-white/80 rounded-full px-3 py-1 hover:bg-[#333344]"
+        className="absolute bottom-4 right-4 text-xs bg-[var(--color-surface-3)] text-[var(--color-text-2)] rounded-full px-3 py-1 hover:bg-[var(--color-border-hover-1)] transition-colors duration-[var(--dur-fast)]"
       >
         Редакт.
       </Link>
@@ -105,15 +105,15 @@ export default function AdminCourses() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      <h2 className="text-white text-xl font-medium mb-6">Курсы</h2>
+      <h2 className="text-[var(--color-text-1)] text-xl font-medium mb-6">Курсы</h2>
       
-      <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 text-white mb-6">
+      <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-4 text-[var(--color-text-1)] mb-6">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="flex items-center gap-2">
             {(["Все","Легкий","Средний","Сложный"] as string[]).map((lvl)=> (
               <button
                 key={lvl}
-                className={`text-xs px-3 py-1 rounded-full border ${difficulty===lvl ? 'bg-[#00a3ff] text-black border-[#00a3ff]' : 'bg-transparent text-white/80 border-[#2a2a35]'}`}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors duration-[var(--dur-fast)] ${difficulty===lvl ? 'bg-[#00a3ff] text-black border-[#00a3ff]' : 'bg-transparent text-[var(--color-text-2)] border-[var(--color-border-2)]'}`}
                 onClick={()=>setDifficulty(lvl)}
               >
                 {lvl}
@@ -124,7 +124,7 @@ export default function AdminCourses() {
             {(["all","free","paid"] as Array<"all"|"free"|"paid">).map((p)=> (
               <button
                 key={p}
-                className={`text-xs px-3 py-1 rounded-full border ${price===p ? 'bg-white text-black border-white' : 'bg-transparent text-white/80 border-[#2a2a35]'}`}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors duration-[var(--dur-fast)] ${price===p ? 'bg-white text-black border-white' : 'bg-transparent text-[var(--color-text-2)] border-[var(--color-border-2)]'}`}
                 onClick={()=>setPrice(p)}
               >
                 {p === 'all' ? 'Все' : p === 'free' ? 'Бесплатные' : 'Платные'}
@@ -136,23 +136,23 @@ export default function AdminCourses() {
             value={q}
             onChange={(e)=>setQ(e.target.value)}
             placeholder="Поиск по названию"
-            className="w-full md:w-64 bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2 outline-none text-white/80"
+            className="w-full md:w-64 bg-[var(--color-surface-1)] border border-[var(--color-border-2)] rounded-lg px-3 py-2 outline-none text-[var(--color-text-2)] placeholder:text-[var(--color-text-4)]"
           />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link href={`/admin/courses/new?fresh=1&draft=${encodeURIComponent(draftId)}`} className="block">
-          <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-6 text-white relative hover:bg-[#1b1b22] transition-colors">
-            <div className="absolute top-4 right-4 text-white/70">
+          <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-6 text-[var(--color-text-1)] relative hover:bg-[var(--color-surface-3)] hover:border-[var(--color-border-hover-1)] transition-all duration-[var(--dur-mid)]">
+            <div className="absolute top-4 right-4 text-[var(--color-text-3)]">
               <ArrowUpRight className="w-6 h-6" />
             </div>
-            <div className="text-white text-lg font-medium">Создать курс</div>
+            <div className="text-[var(--color-text-1)] text-lg font-medium">Создать курс</div>
           </div>
         </Link>
         {loading ? (
-          <div className="text-white/60">Загрузка...</div>
+          <div className="text-[var(--color-text-3)]">Загрузка...</div>
         ) : courses.length === 0 ? (
-          <div className="text-white/60">Курсов пока нет</div>
+          <div className="text-[var(--color-text-3)]">Курсов пока нет</div>
         ) : (
           courses
             .filter((c) => (difficulty === "Все" ? true : (c.difficulty || "").toLowerCase() === difficulty.toLowerCase()))

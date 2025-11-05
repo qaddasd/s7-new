@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "@/hooks/use-toast"
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/otp-input"
+import SocialPanel from "@/components/social-panel"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -127,7 +128,7 @@ export default function ForgotPasswordPage() {
         description: "Пароль успешно изменен" 
       })
       
-      router.push("/login")
+      router.push("/")
     } catch (e: any) {
       toast({ 
         title: "Ошибка", 
@@ -292,6 +293,11 @@ export default function ForgotPasswordPage() {
         )}
       </div>
 
+      <SocialPanel />
+      <div className="flex items-center space-x-2 mt-8 animate-slide-up" style={{ animationDelay: "1400ms" }}>
+        <i className="bi bi-exclamation-circle w-5 h-5 text-white"></i>
+        <span className="text-[#a7a7a7] text-sm">Пользовательские соглашения</span>
+      </div>
       <div
         className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-slide-up"
         style={{ animationDelay: "1800ms" }}
