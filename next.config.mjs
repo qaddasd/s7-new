@@ -9,6 +9,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Отключаем агрессивное кэширование для dev/preview билдов
+  generateBuildId: async () => {
+    // В проде используем дату, чтобы каждый билд имел уникальный ID
+    return `build-${Date.now()}`
+  },
   async rewrites() {
     // Dev proxy to Express backend on :4000 so client-side apiFetch('/api/...') works locally
     const target = process.env.API_DEV_TARGET || 'http://localhost:4000'
