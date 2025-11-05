@@ -432,7 +432,16 @@ export default function LoginPage() {
         {isLogin && (
           <div className="text-center mt-3 animate-slide-up" style={{ animationDelay: "1000ms" }}>
             <button
-              onClick={() => { setIsForgot((v) => !v); if (!isForgot) { setForgotSent(false); setResetCode(""); setNewPwd(""); setNewPwd2("") } }}
+              onClick={() => {
+                const next = !isForgot
+                setIsForgot(next)
+                // всегда сбрасываем стейт потока
+                setForgotSent(false)
+                setForgotStep('request')
+                setResetCode("")
+                setNewPwd("")
+                setNewPwd2("")
+              }}
               className={`text-[#a7a7a7] text-sm transition-all duration-300 hover:text-white ${isForgot ? 'text-white' : ''}`}
             >
               {isForgot ? "Вернуться к входу" : "Забыли пароль?"}
