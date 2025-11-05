@@ -37,6 +37,25 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* DESIGN.md tokens - Dark theme colors */
+  --color-bg: #0a0a0a;
+  --color-surface-1: #0b0b0b;
+  --color-surface-2: #16161c;
+  --color-surface-3: #1f1f1f;
+  --color-text-1: #ffffff;
+  --color-text-2: #e5e5e5;
+  --color-text-3: #a0a0b0;
+  --color-text-4: #636370;
+  --color-text-5: #3a3a3f;
+  --color-border-1: #1f1f1f;
+  --color-border-2: #636370;
+  --color-border-hover-1: #2a2a2a;
+  --color-border-hover-2: #a0a0b0;
+  --primary: #00a3ff;
+  --dur-fast: 200ms;
+  --dur-mid: 300ms;
+  --easing: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {

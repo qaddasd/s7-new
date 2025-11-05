@@ -51,8 +51,8 @@ export default function ForgotPasswordPage() {
       }
       
       toast({ 
-        title: "Код отправлен", 
-        description: "Проверьте вашу почту для получения кода сброса пароля" 
+        title: "Код успешно отправлен на вашу почту", 
+        description: "Проверьте вашу почту" 
       })
       
       setStep("code")
@@ -124,8 +124,8 @@ export default function ForgotPasswordPage() {
       }
       
       toast({ 
-        title: "Успешно", 
-        description: "Пароль успешно изменен" 
+        title: "Ваш пароль успешно сброшен", 
+        description: "Войдите с новым паролем" 
       })
       
       router.push("/")
@@ -192,12 +192,6 @@ export default function ForgotPasswordPage() {
 
         {step === "code" && (
           <div className="space-y-6">
-            <div className="text-center">
-              <p className="text-[var(--color-text-3)] text-sm">
-                Мы отправили код сброса пароля на <span className="text-[var(--color-text-1)]">{email}</span>
-              </p>
-            </div>
-
             <div>
               <label className="block text-[var(--color-text-3)] text-sm mb-2">Код подтверждения</label>
               <div className="flex justify-center">

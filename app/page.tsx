@@ -341,7 +341,7 @@ export default function LoginPage() {
             {isLogin && isForgot && (
               <div className="space-y-4 animate-slide-up" style={{ animationDelay: "820ms" }}>
                 {!forgotSent ? (
-                  <div className="text-[#a7a7a7] text-sm">Мы отправим код на указанную почту</div>
+                  <></>
                 ) : (
                   <div className="grid grid-cols-1 gap-3">
                     <Input
