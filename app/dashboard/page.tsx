@@ -253,7 +253,13 @@ function DashboardInner() {
 
 export default function Dashboard() {
   return (
-    <Suspense fallback={null}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[var(--color-bg)] bg-dots-pattern flex items-center justify-center">
+          <div className="text-[var(--color-text-1)] text-sm opacity-80">Загрузка дашборда…</div>
+        </div>
+      }
+    >
       <DashboardInner />
     </Suspense>
   )

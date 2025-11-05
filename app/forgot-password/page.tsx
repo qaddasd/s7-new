@@ -51,8 +51,8 @@ export default function ForgotPasswordPage() {
       }
       
       toast({ 
-        title: "Код успешно отправлен на вашу почту", 
-        description: "Проверьте вашу почту" 
+        title: "Код отправлен", 
+        description: "Проверьте вашу почту для получения кода сброса пароля" 
       })
       
       setStep("code")
@@ -124,8 +124,8 @@ export default function ForgotPasswordPage() {
       }
       
       toast({ 
-        title: "Ваш пароль успешно сброшен", 
-        description: "Войдите с новым паролем" 
+        title: "Успешно", 
+        description: "Пароль успешно изменен" 
       })
       
       router.push("/")

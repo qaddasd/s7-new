@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast"
 import { EmailVerification } from "@/components/auth/email-verification"
 import { RegisterVerification } from "@/components/auth/register-verification"
 import { setTokens, apiFetch } from "@/lib/api"
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/otp-input"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,6 +31,7 @@ export default function LoginPage() {
   const [resetCode, setResetCode] = useState("")
   const [newPwd, setNewPwd] = useState("")
   const [newPwd2, setNewPwd2] = useState("")
+  const [forgotStep, setForgotStep] = useState<'request' | 'code' | 'reset'>('request')
 
   useEffect(() => {
     if (!loading && user) {
@@ -133,41 +135,56 @@ export default function LoginPage() {
     setVerificationEmail("")
     setIsForgot(false)
     setForgotSent(false)
+    setForgotStep('request')
     setResetCode("")
     setNewPwd("")
     setNewPwd2("")
   }
 
-  const handleForgot = async () => {
+  const handleForgotSendCode = async () => {
     try {
-      if (!forgotSent) {
-        if (!email.trim()) { toast({ title: "Введите почту", variant: "destructive" as any }); return }
-        const res = await fetch("/api/auth/forgot-password", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: email.trim() })
-        })
-        if (!res.ok) throw new Error((await res.json()).error || "Не удалось отправить код")
-        setForgotSent(true)
-        toast({ title: "Отправлено", description: "Код отправлен на почту" })
-      } else {
-        if (resetCode.length !== 6) { toast({ title: "Код из 6 цифр", variant: "destructive" as any }); return }
-        if (newPwd.length < 8) { toast({ title: "Минимум 8 символов", variant: "destructive" as any }); return }
-        if (newPwd !== newPwd2) { toast({ title: "Пароли не совпадают", variant: "destructive" as any }); return }
-        const res = await fetch("/api/auth/reset-password", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: email.trim(), code: resetCode, newPassword: newPwd })
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || "Не удалось изменить пароль")
-        toast({ title: "Пароль обновлён", description: "Теперь войдите с новым паролем" })
-        setIsForgot(false)
-        setForgotSent(false)
-        setResetCode("")
-        setNewPwd("")
-        setNewPwd2("")
-      }
+      if (!email.trim()) { toast({ title: "Введите почту", variant: "destructive" as any }); return }
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim() })
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Не удалось отправить код")
+      setForgotSent(true)
+      setForgotStep('code')
+      toast({ title: "Код отправлен", description: "Код отправлен на вашу почту" })
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Проверьте данные", variant: "destructive" as any })
+    }
+  }
+
+  const handleForgotVerify = () => {
+    if (resetCode.length !== 6) {
+      toast({ title: "Неверный код", description: "Введите 6-значный код", variant: "destructive" as any })
+      return
+    }
+    setForgotStep('reset')
+  }
+
+  const handleForgotReset = async () => {
+    try {
+      if (resetCode.length !== 6) { toast({ title: "Код из 6 цифр", variant: "destructive" as any }); return }
+      if (newPwd.length < 8) { toast({ title: "Минимум 8 символов", variant: "destructive" as any }); return }
+      if (newPwd !== newPwd2) { toast({ title: "Пароли не совпадают", variant: "destructive" as any }); return }
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), code: resetCode, newPassword: newPwd })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Не удалось изменить пароль")
+      toast({ title: "Пароль обновлён", description: "Теперь войдите с новым паролем" })
+      setIsForgot(false)
+      setForgotSent(false)
+      setForgotStep('request')
+      setResetCode("")
+      setNewPwd("")
+      setNewPwd2("")
     } catch (e: any) {
       toast({ title: "Ошибка", description: e?.message || "Проверьте данные", variant: "destructive" as any })
     }
@@ -340,40 +357,57 @@ export default function LoginPage() {
 
             {isLogin && isForgot && (
               <div className="space-y-4 animate-slide-up" style={{ animationDelay: "820ms" }}>
-                {!forgotSent ? (
-                  <></>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3">
-                    <Input
-                      type="text"
-                      placeholder="Код из письма (6 цифр)"
-                      value={resetCode}
-                      onChange={(e)=>setResetCode(e.target.value)}
-                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
-                    />
-                    <Input
-                      type="password"
-                      placeholder="Новый пароль"
-                      value={newPwd}
-                      onChange={(e)=>setNewPwd(e.target.value)}
-                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
-                    />
-                    <Input
-                      type="password"
-                      placeholder="Повторите пароль"
-                      value={newPwd2}
-                      onChange={(e)=>setNewPwd2(e.target.value)}
-                      className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
-                    />
-                  </div>
+                {(!forgotSent || forgotStep === 'request') && (
+                  <Button onClick={handleForgotSendCode} variant="outline" className="w-full py-2.5">Отправить код</Button>
                 )}
-                <Button
-                  onClick={handleForgot}
-                  variant="outline"
-                  className="w-full py-2.5"
-                >
-                  {!forgotSent ? "Отправить код" : "Сменить пароль"}
-                </Button>
+
+                {forgotSent && forgotStep === 'code' && (
+                  <>
+                    <div className="flex justify-center">
+                      <InputOTP
+                        maxLength={6}
+                        value={resetCode}
+                        onChange={setResetCode as any}
+                        containerClassName="flex gap-2"
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} className="h-11 w-11" />
+                          <InputOTPSlot index={1} className="h-11 w-11" />
+                          <InputOTPSlot index={2} className="h-11 w-11" />
+                        </InputOTPGroup>
+                        <InputOTPSeparator />
+                        <InputOTPGroup>
+                          <InputOTPSlot index={3} className="h-11 w-11" />
+                          <InputOTPSlot index={4} className="h-11 w-11" />
+                          <InputOTPSlot index={5} className="h-11 w-11" />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                    <Button onClick={handleForgotVerify} disabled={resetCode.length !== 6} variant="outline" className="w-full py-2.5">Подтвердить код</Button>
+                  </>
+                )}
+
+                {forgotSent && forgotStep === 'reset' && (
+                  <>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Input
+                        type="password"
+                        placeholder="Новый пароль"
+                        value={newPwd}
+                        onChange={(e)=>setNewPwd(e.target.value)}
+                        className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
+                      />
+                      <Input
+                        type="password"
+                        placeholder="Повторите пароль"
+                        value={newPwd2}
+                        onChange={(e)=>setNewPwd2(e.target.value)}
+                        className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0"
+                      />
+                    </div>
+                    <Button onClick={handleForgotReset} variant="outline" className="w-full py-2.5">Сменить пароль</Button>
+                  </>
+                )}
               </div>
             )}
           </div>
