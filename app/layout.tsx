@@ -7,7 +7,6 @@ import { Toaster } from '@/components/ui/toaster'
 import { ConfirmProvider } from '@/components/ui/confirm'
 import EntryToasts from '@/components/system/entry-toasts'
 import './globals.css'
-import '../styles/globals.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 
 export const metadata: Metadata = {
