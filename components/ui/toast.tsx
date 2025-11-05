@@ -25,7 +25,7 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all backdrop-blur-[2px] animate-fade-in-up',
+  'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all backdrop-blur-[2px] toast-motion',
   {
     variants: {
       variant: {

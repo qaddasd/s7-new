@@ -147,33 +147,34 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div
-        className="w-full max-w-sm bg-[#0b0b0b] border border-dashed border-[#1f1f1f] rounded-2xl p-7 backdrop-blur-[1px] transition-all duration-500 ease-in-out hover:bg-[#141414] hover:border-[#2a2a2a] animate-slide-up"
-        style={{ animationDelay: "400ms" }}
+        className="w-full max-w-sm bg-[var(--color-surface-1)] border border-dashed border-[var(--color-border-1)] rounded-2xl p-7 backdrop-blur-[1px] transition-all duration-[var(--dur-mid)] ease-in-out hover:bg-[var(--color-surface-2)] hover:border-[var(--color-border-hover-1)] animate-slide-up"
+        style={{ animationDelay: "200ms" }}
       >
-        <h1 className="text-white text-3xl font-medium text-center mb-7 transition-all duration-300 tracking-tight">
+        <h1 className="text-[var(--color-text-1)] text-3xl font-medium text-center mb-7 transition-all duration-[var(--dur-fast)] tracking-tight">
           Сброс пароля
         </h1>
 
         {step === "request" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[#a7a7a7] text-sm mb-2">Email</label>
+              <label className="block text-[var(--color-text-3)] text-sm mb-2">Email</label>
               <div className="relative">
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 pr-6 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                  className="bg-transparent h-auto py-2.5 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 pr-6 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
                 />
-                <i className="bi bi-envelope absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7]" />
+                <i className="bi bi-envelope absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[var(--color-text-3)]" />
               </div>
             </div>
 
             <Button
               onClick={handleRequestReset}
               disabled={loading}
-              className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full transition-all duration-300 transform hover:scale-102 active:scale-95"
+              variant="outline"
+              className="w-full py-3"
             >
               {loading ? "Отправка..." : "Отправить код"}
             </Button>
@@ -181,7 +182,7 @@ export default function ForgotPasswordPage() {
             <div className="text-center">
               <button
                 onClick={() => router.push("/")}
-                className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300"
+                className="text-[var(--color-text-3)] text-sm hover:text-[var(--color-text-1)] transition-all duration-[var(--dur-fast)]"
               >
                 Назад к входу
               </button>
@@ -192,13 +193,13 @@ export default function ForgotPasswordPage() {
         {step === "code" && (
           <div className="space-y-6">
             <div className="text-center">
-              <p className="text-[#a7a7a7] text-sm">
-                Мы отправили код сброса пароля на <span className="text-white">{email}</span>
+              <p className="text-[var(--color-text-3)] text-sm">
+                Мы отправили код сброса пароля на <span className="text-[var(--color-text-1)]">{email}</span>
               </p>
             </div>
 
             <div>
-              <label className="block text-[#a7a7a7] text-sm mb-2">Код подтверждения</label>
+              <label className="block text-[var(--color-text-3)] text-sm mb-2">Код подтверждения</label>
               <div className="flex justify-center">
                 <InputOTP
                   maxLength={6}
@@ -224,7 +225,8 @@ export default function ForgotPasswordPage() {
             <Button
               onClick={handleVerifyCode}
               disabled={code.length !== 6}
-              className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full transition-all duration-300 transform hover:scale-102 active:scale-95"
+              variant="outline"
+              className="w-full py-3"
             >
               Подтвердить код
             </Button>
@@ -234,14 +236,14 @@ export default function ForgotPasswordPage() {
                 onClick={handleRequestReset}
                 disabled={countdown > 0 || loading}
                 variant="outline"
-                className="flex-1 border-[#1f1f1f] text-[#a7a7a7] hover:bg-[#141414] hover:border-[#2a2a2a] hover:text-white"
+                className="flex-1"
               >
                 {countdown > 0 ? `Отправить заново (${countdown})` : "Отправить заново"}
               </Button>
               <Button
                 onClick={() => setStep("request")}
                 variant="outline"
-                className="flex-1 border-[#1f1f1f] text-[#a7a7a7] hover:bg-[#141414] hover:border-[#2a2a2a] hover:text-white"
+                className="flex-1"
               >
                 Назад
               </Button>
@@ -252,31 +254,32 @@ export default function ForgotPasswordPage() {
         {step === "reset" && (
           <div className="space-y-6">
             <div>
-              <label className="block text-[#a7a7a7] text-sm mb-2">Новый пароль</label>
+              <label className="block text-[var(--color-text-3)] text-sm mb-2">Новый пароль</label>
               <Input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Новый пароль"
-                className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                className="bg-transparent h-auto py-2.5 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
               />
             </div>
 
             <div>
-              <label className="block text-[#a7a7a7] text-sm mb-2">Подтвердите пароль</label>
+              <label className="block text-[var(--color-text-3)] text-sm mb-2">Подтвердите пароль</label>
               <Input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Подтвердите пароль"
-                className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                className="bg-transparent h-auto py-2.5 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
               />
             </div>
 
             <Button
               onClick={handleResetPassword}
               disabled={loading}
-              className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full transition-all duration-300 transform hover:scale-102 active:scale-95"
+              variant="outline"
+              className="w-full py-3"
             >
               {loading ? "Сброс..." : "Сбросить пароль"}
             </Button>
@@ -284,7 +287,7 @@ export default function ForgotPasswordPage() {
             <div className="text-center">
               <button
                 onClick={() => setStep("code")}
-                className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300"
+                className="text-[var(--color-text-3)] text-sm hover:text-[var(--color-text-1)] transition-all duration-[var(--dur-fast)]"
               >
                 Назад
               </button>

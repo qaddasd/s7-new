@@ -261,10 +261,10 @@ export default function LoginPage() {
       </div>
 
       <div
-        className={`w-full max-w-sm bg-[#0b0b0b] border border-dashed border-[#1f1f1f] rounded-2xl ${isLogin ? "p-6" : "p-7"} backdrop-blur-[1px] transition-all duration-500 ease-in-out hover:bg-[#141414] hover:border-[#2a2a2a] animate-slide-up`}
-        style={{ animationDelay: "400ms" }}
+        className={`w-full max-w-sm bg-[var(--color-surface-1)] border border-dashed border-[var(--color-border-1)] rounded-2xl ${isLogin ? "p-6" : "p-7"} backdrop-blur-[1px] transition-all duration-[var(--dur-mid)] ease-in-out hover:bg-[var(--color-surface-2)] hover:border-[var(--color-border-hover-1)] animate-slide-up`}
+        style={{ animationDelay: "200ms" }}
       >
-        <h1 className={`text-white text-3xl font-medium text-center ${isLogin ? "mb-6" : "mb-7"} transition-all duration-300 tracking-tight`}>
+        <h1 className={`text-[var(--color-text-1)] text-3xl font-medium text-center ${isLogin ? "mb-6" : "mb-7"} transition-all duration-[var(--dur-fast)] tracking-tight`}>
           {isLogin ? "Вход" : "Регистрация"}
         </h1>
 
@@ -277,7 +277,7 @@ export default function LoginPage() {
                   placeholder="Полное имя"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                  className="bg-transparent h-auto py-2.5 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
                 />
                 <i className="bi bi-person absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
               </div>
@@ -321,7 +321,7 @@ export default function LoginPage() {
                 placeholder="Почта"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="bg-transparent h-auto py-2.5 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                className="bg-transparent h-auto py-2.5 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
               />
               <i className="bi bi-envelope absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
             </div>
@@ -332,7 +332,7 @@ export default function LoginPage() {
                   placeholder="Пароль"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-transparent h-auto py-3 border-0 border-b border-[#1f1f1f] rounded-none px-0 pb-3 text-white placeholder:text-[#a7a7a7] focus:border-[#2a2a2a] focus:ring-0 focus-visible:ring-0 transition-all duration-300 hover:border-[#2a2a2a]"
+                  className="bg-transparent h-auto py-3 border-0 border-b border-[var(--color-border-1)] rounded-none px-0 pb-3 text-[var(--color-text-1)] placeholder:text-[var(--color-text-3)] focus:border-[var(--color-border-hover-1)] focus:ring-0 focus-visible:ring-0 transition-all duration-[var(--dur-fast)] hover:border-[var(--color-border-hover-1)]"
                 />
                 <i className="bi bi-lock absolute right-0 top-1/2 -translate-y-1/2 text-lg text-[#a7a7a7] transition-colors duration-300"></i>
               </div>
@@ -369,7 +369,8 @@ export default function LoginPage() {
                 )}
                 <Button
                   onClick={handleForgot}
-                  className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-2.5 rounded-full transition-all duration-300 transform hover:scale-[1.02] active:scale-95"
+                  variant="outline"
+                  className="w-full py-2.5"
                 >
                   {!forgotSent ? "Отправить код" : "Сменить пароль"}
                 </Button>
@@ -379,8 +380,8 @@ export default function LoginPage() {
         {isLogin && !isForgot && (
           <Button
             onClick={handleLogin}
-            className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full mt-6 transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up"
-            style={{ animationDelay: "900ms" }}
+            variant="outline"
+            className="w-full py-3 mt-6"
           >
             Войти
           </Button>
@@ -388,8 +389,8 @@ export default function LoginPage() {
         {!isLogin && (
           <Button
             onClick={handleRegister}
-            className="w-full bg-[#0f0f0f] border border-[#1a1a1a] hover:bg-[#141414] hover:border-[#2a2a2a] text-white font-medium py-3 rounded-full mt-6 transition-all duration-300 transform hover:scale-[1.02] active:scale-95 animate-slide-up"
-            style={{ animationDelay: "900ms" }}
+            variant="outline"
+            className="w-full py-3 mt-6"
           >
             Зарегистрироваться
           </Button>
@@ -412,7 +413,7 @@ export default function LoginPage() {
       <div className="text-center mt-6 animate-slide-up" style={{ animationDelay: "1000ms" }}>
         <button
           onClick={() => setIsLogin(!isLogin)}
-          className="text-[#a7a7a7] text-sm hover:text-white transition-all duration-300 transform hover:scale-101"
+          className="text-[var(--color-text-3)] text-sm hover:text-[var(--color-text-1)] transition-all duration-[var(--dur-fast)] transform hover:scale-101"
         >
           {isLogin ? "Нет аккаунта? Зарегистрируйтесь" : "Войти"}
         </button>

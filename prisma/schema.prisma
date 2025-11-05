@@ -115,6 +115,8 @@ model User {
   kruzhokLessonProgress KruzhokLessonProgress[]
   // Opposite side for KruzhokAttendance.markedBy
   kruzhokAttendanceMarked KruzhokAttendance[]
+  // Opposite side for DailyMissionProgress.user
+  dailyMissionProgress    DailyMissionProgress[]
 }
 
 model Session {
@@ -161,6 +163,8 @@ model Course {
   purchases     Purchase[]
   // Opposite side of CourseQuestion.course
   questions     CourseQuestion[]
+  // Opposite side for DailyMission.course
+  dailyMissions DailyMission[]
 }
 
 model CourseModule {

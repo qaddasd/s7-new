@@ -40,6 +40,9 @@ export const metadata: Metadata = {
     shortcut: '/logo-s7.png',
     apple: '/logo-s7.png',
   },
+}
+
+export const viewport = {
   themeColor: '#0e0e12',
 }
 

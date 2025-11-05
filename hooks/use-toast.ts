@@ -1,11 +1,11 @@
-﻿'use client'
+'use client'
 
 import * as React from 'react'
 
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 2
+const TOAST_REMOVE_DELAY = 400
 
 type ToasterToast = ToastProps & {
   id: string
@@ -136,6 +136,9 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>
 
+// Default visible duration for a toast before auto-dismiss (ms)
+const AUTO_CLOSE_MS = 4200
+
 function toast({ ...props }: Toast) {
   const id = genId()
 
@@ -157,6 +160,13 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Auto-dismiss after a short delay so the toast drops down, waits, then fades out
+  if (typeof window !== 'undefined') {
+    try {
+      setTimeout(() => dismiss(), AUTO_CLOSE_MS)
+    } catch {}
+  }
 
   return {
     id: id,
