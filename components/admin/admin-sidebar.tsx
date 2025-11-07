@@ -63,7 +63,11 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => onClose()}
+                onClick={() => {
+                  try {
+                    if (typeof window !== 'undefined' && window.innerWidth < 768) onClose()
+                  } catch {}
+                }}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-[var(--dur-fast)] ${
                   active
                     ? "bg-[var(--color-accent-warm)] text-black"

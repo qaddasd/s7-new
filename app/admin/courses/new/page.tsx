@@ -496,7 +496,7 @@ export default function Page() {
                 const xpReward = typeof dLesson.quizXp === 'number' ? dLesson.quizXp : 100
                 if (text && opts.length >= 2 && correctIndex >= 0 && correctIndex < opts.length) {
                   try {
-                    await apiFetch(`/api/admin/courses/${created.id}/questions`, {
+                    await apiFetch(`/courses/${created.id}/questions`, {
                       method: "POST",
                       body: JSON.stringify({
                         text,
@@ -574,7 +574,25 @@ export default function Page() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      <h2 className="text-white text-xl font-medium mb-6">Создать курс</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-white text-xl font-medium">Создать курс</h2>
+        <button
+          onClick={() => {
+            try {
+              const raw = localStorage.getItem(draftKey) || localStorage.getItem("s7_admin_course_draft")
+              const d = raw ? JSON.parse(raw) : null
+              const id = (editId as string) || d?.courseId || ""
+              if (!id) { toast({ title: "Сначала опубликуйте курс", description: "После публикации станет доступен конструктор игры", variant: "destructive" as any }); return }
+              router.push(`/admin/courses/${encodeURIComponent(id)}/quiz`)
+            } catch {
+              toast({ title: "Нет курса", description: "Сначала опубликуйте курс", variant: "destructive" as any })
+            }
+          }}
+          className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2"
+        >
+          Игра
+        </button>
+      </div>
 
       <div className="max-w-2xl space-y-5">
         

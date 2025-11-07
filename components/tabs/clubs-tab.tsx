@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api"
-import { Plus, Calendar, MapPin, Users, Check, X, Clock } from "lucide-react"
+import { Plus, Calendar, MapPin, Users, Check, X, Clock, Building2, ArrowUpRight, Trash2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { useAuth } from "@/components/auth/auth-context"
 
@@ -49,6 +49,8 @@ export default function ClubsTab() {
   const [extraFio, setExtraFio] = useState<Record<string, string>>({})
   const [extraEmail, setExtraEmail] = useState<Record<string, string>>({})
   const [addDate, setAddDate] = useState<Record<string, string>>({})
+  const [openClubId, setOpenClubId] = useState<string | null>(null)
+  const [currentDate, setCurrentDate] = useState("")
 
   const load = async () => {
     setLoading(true)
@@ -63,6 +65,12 @@ export default function ClubsTab() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    const now = new Date()
+    const months = ["Января","Февраля","Марта","Апреля","Мая","Июня","Июля","Августа","Сентября","Октября","Ноября","Декабря"]
+    const d = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`
+    setCurrentDate(d)
+  }, [])
 
   const createClub = async () => {
     if (!name.trim()) return
@@ -86,7 +94,17 @@ export default function ClubsTab() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up space-y-6">
-      {user?.role === 'admin' && (
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-white text-2xl md:text-3xl font-bold">Кружок</h1>
+        </div>
+        <div className="text-right">
+          <div className="text-white text-xl font-semibold">{currentDate.split(" ").slice(0,2).join(" ")}</div>
+          <div className="text-white/60 text-xs">{currentDate.split(" ").slice(2).join(" ")}</div>
+        </div>
+      </div>
+
+      {String(user?.role || "").toUpperCase() === 'ADMIN' && (
         <section className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white">
           <div className="flex items-center gap-3 mb-3">
             <Plus className="w-5 h-5" />
@@ -104,26 +122,37 @@ export default function ClubsTab() {
       )}
 
       <section className="space-y-3">
-        <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-[#1b1b22] border border-[#2a2a35] text-white/80">
-          <Calendar className="w-4 h-4" />
-          <span>Мои кружки</span>
-        </div>
         {loading && <div className="text-white/60">Загрузка...</div>}
         {!loading && clubs.length === 0 && (
           <div className="text-white/60">Кружков пока нет</div>
         )}
         {!loading && clubs.map((c) => (
-          <div key={c.id} className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white space-y-2">
-            <div className="text-lg font-semibold">{c.name}</div>
-            {c.location && (
-              <div className="text-white/70 text-sm inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{c.location}</div>
-            )}
-            {c.description && (
-              <div className="text-white/70 text-sm">{c.description}</div>
-            )}
-            
-            <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
-              <div className="text-sm font-medium mb-2">Менторы</div>
+          <div key={c.id} className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-5 text-white space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#0f0f14] border border-[#2a2a35] inline-flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-white/80" />
+              </div>
+              <div className="flex-1">
+                <div className="text-xl font-semibold">{c.name}</div>
+                {c.location && <div className="text-white/70 text-sm inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{c.location}</div>}
+              </div>
+              <button onClick={() => setOpenClubId(openClubId === c.id ? null : c.id)} className="w-9 h-9 rounded-lg bg-[#0f0f14] border border-[#2a2a35] inline-flex items-center justify-center">
+                <ArrowUpRight className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#00a3ff] text-black text-sm font-medium">Кол-во классов: {(c.classes||[]).length}</div>
+              {String(user?.role || "").toUpperCase() === 'ADMIN' && (
+                <button onClick={async()=>{ const ok = window.confirm("Удалить кружок?"); if(!ok) return; try{ await apiFetch(`/api/clubs/${c.id}`, { method: 'DELETE' }); toast({ title: "Кружок удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">
+                  <Trash2 className="w-4 h-4" /> Удалить
+                </button>
+              )}
+            </div>
+
+            {openClubId === c.id && (
+            <div className="space-y-3">
+              <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
+                <div className="text-sm font-medium mb-2">Менторы</div>
               <div className="flex gap-2">
                 <input value={mentorEmail[c.id]||""} onChange={(e)=>setMentorEmail(prev=>({...prev,[c.id]:e.target.value}))} placeholder="email@example.com" className="flex-1 bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm" />
                 <button onClick={async()=>{
@@ -156,6 +185,10 @@ export default function ClubsTab() {
                         <div className="text-white/60 text-xs inline-flex items-center gap-1 mt-1"><Users className="w-3 h-3" />Участников: {(cl.enrollments||[]).length}</div>
                         <div className="text-white/60 text-xs inline-flex items-center gap-1 mt-1"><Calendar className="w-3 h-3" />Расписание: {(cl.scheduleItems||[]).length}</div>
                       </div>
+                      <div className="flex items-center gap-2">
+                      {String(user?.role || "").toUpperCase() === 'ADMIN' && (
+                        <button onClick={async()=>{ const ok = window.confirm("Удалить класс?"); if(!ok) return; try{ await apiFetch(`/api/clubs/classes/${cl.id}`, { method: 'DELETE' }); toast({ title: "Класс удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Удалить</button>
+                      )}
                       <button onClick={()=>{
                         setExpandedClassId(isOpen ? null : cl.id)
                         if (!isOpen) {
@@ -193,6 +226,7 @@ export default function ClubsTab() {
                           })()
                         }
                       }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">{isOpen?"Скрыть":"Управление"}</button>
+                      </div>
                     </div>
                     {isOpen && (
                       <div className="space-y-4">
@@ -534,10 +568,12 @@ export default function ClubsTab() {
                         </div>
 
                         
-                        <div className="bg-[#140f0f] border border-[#432424] rounded-xl p-3">
-                          <div className="text-sm font-medium mb-2">Опасная зона</div>
-                          <button onClick={async()=>{ try{ await apiFetch(`/clubs/classes/${cl.id}`, { method: 'DELETE' }); toast({ title: "Класс удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="text-xs rounded-full bg-[#a33] hover:bg-[#c44] px-3 py-2 text-white">Удалить класс</button>
-                        </div>
+                        {String(user?.role || "").toUpperCase() === 'ADMIN' && (
+                          <div className="bg-[#140f0f] border border-[#432424] rounded-xl p-3">
+                            <div className="text-sm font-medium mb-2">Опасная зона</div>
+                            <button onClick={async()=>{ try{ await apiFetch(`/api/clubs/classes/${cl.id}`, { method: 'DELETE' }); toast({ title: "Класс удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="text-xs rounded-full bg-[#a33] hover:bg-[#c44] px-3 py-2 text-white">Удалить класс</button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -554,12 +590,14 @@ export default function ClubsTab() {
                 <button onClick={async()=>{
                   const payload = newClass[c.id]
                   if (!payload?.title?.trim()) return
-                  await apiFetch(`/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) })
+                  await apiFetch(`/api/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) })
                   setNewClass(prev=>{ const n={...prev}; delete n[c.id]; return n })
                   await load()
                 }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Создать</button>
               </div>
             </div>
+            </div>
+            )}
           </div>
         ))}
       </section>

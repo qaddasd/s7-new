@@ -85,6 +85,48 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
   log("club.create", { id: club.id, ownerId: req.user!.id })
 })
 
+// Delete a club with all nested data (admin only)
+router.delete("/:clubId", async (req: AuthenticatedRequest, res: Response) => {
+  const { clubId } = req.params
+  if ((req.user as any)?.role !== "ADMIN") {
+    return res.status(403).json({ error: "Only admins can delete clubs" })
+  }
+  const club = await db.club.findUnique({ where: { id: clubId } })
+  if (!club) return res.status(404).json({ error: "Club not found" })
+
+  const classes = await db.clubClass.findMany({ where: { clubId }, select: { id: true } })
+  const classIds = classes.map((c: any) => c.id)
+  if (classIds.length > 0) {
+    const [sessions, assignments] = await Promise.all([
+      db.clubSession.findMany({ where: { classId: { in: classIds } }, select: { id: true } }),
+      db.clubAssignment.findMany({ where: { classId: { in: classIds } }, select: { id: true } }),
+    ])
+    const sessionIds = sessions.map((s: any) => s.id)
+    const assignmentIds = assignments.map((a: any) => a.id)
+
+    await db.$transaction([
+      assignmentIds.length ? db.assignmentSubmission.deleteMany({ where: { assignmentId: { in: assignmentIds } } }) : (db as any).$executeRaw`SELECT 1`,
+      sessionIds.length ? db.attendance.deleteMany({ where: { sessionId: { in: sessionIds } } }) : (db as any).$executeRaw`SELECT 1`,
+      db.clubResource.deleteMany({ where: { classId: { in: classIds } } }),
+      db.clubAssignment.deleteMany({ where: { classId: { in: classIds } } }),
+      db.scheduleItem.deleteMany({ where: { classId: { in: classIds } } }),
+      db.clubSession.deleteMany({ where: { classId: { in: classIds } } }),
+      db.classEnrollment.deleteMany({ where: { classId: { in: classIds } } }),
+      db.clubClass.deleteMany({ where: { id: { in: classIds } } }),
+      db.clubMentor.deleteMany({ where: { clubId } }),
+      db.club.delete({ where: { id: clubId } }),
+    ])
+  } else {
+    await db.$transaction([
+      db.clubMentor.deleteMany({ where: { clubId } }),
+      db.club.delete({ where: { id: clubId } }),
+    ])
+  }
+
+  res.json({ ok: true })
+  log("club.delete", { id: clubId })
+})
+
 const classCreateSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
