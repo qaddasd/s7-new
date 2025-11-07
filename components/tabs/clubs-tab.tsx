@@ -232,7 +232,6 @@ export default function ClubsTab() {
                               }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Добавить</button>
                             </div>
                           </div>
-                        </div>
 
                         <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
                           <div className="text-sm font-medium mb-2">Добавить дату занятия</div>
