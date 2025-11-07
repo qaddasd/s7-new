@@ -1,6 +1,7 @@
-﻿import { Router, type Response } from "express"
+import { Router, type Response } from "express"
 import { z } from "zod"
 import { prisma } from "../db"
+import { hashPassword } from "../utils/password"
 import { requireAuth } from "../middleware/auth"
 import type { AuthenticatedRequest } from "../types"
 
@@ -16,6 +17,25 @@ const clubCreateSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   location: z.string().optional(),
+})
+
+// Create single session by date (adds a new column in attendance grid)
+router.post("/classes/:classId/sessions", async (req: AuthenticatedRequest, res: Response) => {
+  const { classId } = req.params
+  const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
+  if (!cls) return res.status(404).json({ error: "Class not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const body = z.object({ date: z.string().min(4) }).safeParse(req.body)
+  if (!body.success) return res.status(400).json({ error: body.error.flatten() })
+  const d = new Date(String(body.data.date))
+  if (!(d instanceof Date) || isNaN(d.getTime())) return res.status(400).json({ error: "Invalid date" })
+  const s = await db.clubSession.upsert({
+    where: { classId_date_scheduleItemId: { classId, date: d, scheduleItemId: null } },
+    create: { classId, date: d, scheduleItemId: null },
+    update: {},
+  })
+  res.status(201).json(s)
 })
 
 router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
@@ -47,6 +67,9 @@ router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
 })
 
 router.post("/", async (req: AuthenticatedRequest, res: Response) => {
+  if ((req.user as any)?.role !== "ADMIN") {
+    return res.status(403).json({ error: "Only admins can create clubs" })
+  }
   const parsed = clubCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -342,6 +365,7 @@ router.post("/classes/:classId/enroll", async (req: AuthenticatedRequest, res: R
 })
 
 const enrollByEmailSchema = z.object({ email: z.string().email() })
+const extraStudentSchema = z.object({ fullName: z.string().min(1), email: z.string().email().optional() })
 
 router.post("/classes/:classId/enroll-by-email", async (req: AuthenticatedRequest, res: Response) => {
   const { classId } = req.params
@@ -359,6 +383,37 @@ router.post("/classes/:classId/enroll-by-email", async (req: AuthenticatedReques
     update: { status: "active" },
   })
   res.status(201).json(e)
+})
+
+// Extra students by FIO (creates a lightweight user and enrolls)
+router.post("/classes/:classId/extra-students", async (req: AuthenticatedRequest, res: Response) => {
+  const { classId } = req.params
+  const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
+  if (!cls) return res.status(404).json({ error: "Class not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const parsed = extraStudentSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const fullName = parsed.data.fullName.trim()
+  let email = (parsed.data.email || "").trim().toLowerCase()
+  if (!email) {
+    const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`
+    email = `student+${suffix}@students.local`
+  }
+  // ensure unique email
+  let exists = await db.user.findUnique({ where: { email } }).catch(()=>null)
+  if (exists) {
+    const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`
+    email = `student+${suffix}@students.local`
+  }
+  const passwordHash = await hashPassword(`club-${Math.random().toString(36).slice(2,10)}`)
+  const user = await db.user.create({ data: { email, passwordHash, fullName, role: "USER", emailVerified: true } })
+  const e = await db.classEnrollment.upsert({
+    where: { classId_userId: { classId, userId: user.id } },
+    create: { classId, userId: user.id },
+    update: { status: "active" },
+  })
+  res.status(201).json({ id: user.id, fullName: user.fullName, email: user.email, enrollmentId: e.id })
 })
 
 router.delete("/classes/:classId/enroll/:userId", async (req: AuthenticatedRequest, res: Response) => {

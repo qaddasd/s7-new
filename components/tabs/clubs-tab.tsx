@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { Plus, Calendar, MapPin, Users, Check, X, Clock } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth/auth-context"
 
 type Club = {
   id: string
@@ -22,6 +23,7 @@ type Club = {
 }
 
 export default function ClubsTab() {
+  const { user } = useAuth() as any
   const [loading, setLoading] = useState(true)
   const [clubs, setClubs] = useState<Club[]>([])
   const [name, setName] = useState("")
@@ -44,6 +46,9 @@ export default function ClubsTab() {
   const [subs, setSubs] = useState<Record<string, Array<{ id: string; student: { id: string; fullName?: string; email: string }; grade?: number; feedback?: string; submittedAt: string }>>>({})
   const [mySub, setMySub] = useState<Record<string, { answerText?: string; attachmentUrl?: string }>>({})
   const [gradeForm, setGradeForm] = useState<Record<string, { grade?: number; feedback?: string }>>({})
+  const [extraFio, setExtraFio] = useState<Record<string, string>>({})
+  const [extraEmail, setExtraEmail] = useState<Record<string, string>>({})
+  const [addDate, setAddDate] = useState<Record<string, string>>({})
 
   const load = async () => {
     setLoading(true)
@@ -81,20 +86,22 @@ export default function ClubsTab() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up space-y-6">
-      <section className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white">
-        <div className="flex items-center gap-3 mb-3">
-          <Plus className="w-5 h-5" />
-          <div className="font-semibold">Создать кружок</div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Название" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
-          <input value={location} onChange={(e)=>setLocation(e.target.value)} placeholder="Локация" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
-          <input value={desc} onChange={(e)=>setDesc(e.target.value)} placeholder="Описание (необязательно)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
-        </div>
-        <div className="mt-3">
-          <button onClick={createClub} disabled={creating || !name.trim()} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] disabled:opacity-60 text-black font-medium px-5 py-2">Создать</button>
-        </div>
-      </section>
+      {user?.role === 'admin' && (
+        <section className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white">
+          <div className="flex items-center gap-3 mb-3">
+            <Plus className="w-5 h-5" />
+            <div className="font-semibold">Создать кружок</div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Название" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+            <input value={location} onChange={(e)=>setLocation(e.target.value)} placeholder="Локация" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+            <input value={desc} onChange={(e)=>setDesc(e.target.value)} placeholder="Описание (необязательно)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+          </div>
+          <div className="mt-3">
+            <button onClick={createClub} disabled={creating || !name.trim()} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] disabled:opacity-60 text-black font-medium px-5 py-2">Создать</button>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-[#1b1b22] border border-[#2a2a35] text-white/80">
@@ -206,6 +213,39 @@ export default function ClubsTab() {
                               await load()
                             }} className="text-xs rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-3 py-2 text-black font-medium">Добавить</button>
                           </div>
+
+                          <div className="mt-4">
+                            <div className="text-sm font-medium mb-2">Добавить ученика (ФИО)</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                              <input value={extraFio[cl.id]||""} onChange={(e)=>setExtraFio(prev=>({...prev,[cl.id]:e.target.value}))} placeholder="ФИО" className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm" />
+                              <input value={extraEmail[cl.id]||""} onChange={(e)=>setExtraEmail(prev=>({...prev,[cl.id]:e.target.value}))} placeholder="Email (необязательно)" className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm" />
+                              <button onClick={async()=>{
+                                const fullName=(extraFio[cl.id]||"").trim(); if(!fullName) return
+                                try {
+                                  await apiFetch(`/api/clubs/classes/${cl.id}/extra-students`,{ method:"POST", body: JSON.stringify({ fullName, email: (extraEmail[cl.id]||"").trim()||undefined })})
+                                  toast({ title: "Ученик добавлен" })
+                                } catch (e:any) {
+                                  toast({ title: "Ошибка", description: e?.message||"Не удалось добавить", variant: "destructive" as any })
+                                }
+                                setExtraFio(prev=>({...prev,[cl.id]:""})); setExtraEmail(prev=>({...prev,[cl.id]:""}))
+                                await load()
+                              }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Добавить</button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
+                          <div className="text-sm font-medium mb-2">Добавить дату занятия</div>
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm items-center">
+                            <input type="date" value={addDate[cl.id]||new Date().toISOString().slice(0,10)} onChange={(e)=>setAddDate(prev=>({...prev,[cl.id]: e.target.value}))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
+                            <button onClick={async()=>{
+                              const d=(addDate[cl.id]||new Date().toISOString().slice(0,10))
+                              try { await apiFetch(`/api/clubs/classes/${cl.id}/sessions`,{ method:'POST', body: JSON.stringify({ date: d }) }); toast({ title: 'Дата добавлена' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось добавить дату', variant: 'destructive' as any }) }
+                              const list = await apiFetch<any[]>(`/api/clubs/classes/${cl.id}/sessions?from=${d}&to=${d}`)
+                              setSessions(prev=>({ ...prev, [cl.id]: Array.from(new Set([...(prev[cl.id]||[]), ...list])).sort((a:any,b:any)=> new Date(a.date).getTime()-new Date(b.date).getTime()) }))
+                            }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Добавить дату</button>
+                          </div>
+                        </div>
 
                         <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
                           <div className="text-sm font-medium mb-2">Материалы</div>
@@ -371,7 +411,7 @@ export default function ClubsTab() {
                                     return (
                                       <div key={u.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center text-sm">
                                         <div className="col-span-2">{u.fullName || u.email}</div>
-                                        <select value={st} onChange={(e)=>setAttendanceDraft(prev=>({ ...prev, [key]: { ...draft, [u.id]: { status: e.target.value, feedback: fb } } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2">
+                                        <select value={st} onChange={async (e)=>{ const val = e.target.value; setAttendanceDraft(prev=>({ ...prev, [key]: { ...draft, [u.id]: { status: val, feedback: fb } } })); try { await apiFetch(`/api/clubs/sessions/${s.id}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: val, feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) } }} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2">
                                           <option value="present">Пришёл</option>
                                           <option value="absent">Не пришёл</option>
                                           <option value="late">Опоздал</option>
@@ -379,15 +419,17 @@ export default function ClubsTab() {
                                         </select>
                                         <input placeholder="Фидбек (опц.)" value={fb} onChange={(e)=>setAttendanceDraft(prev=>({ ...prev, [key]: { ...draft, [u.id]: { status: st, feedback: e.target.value } } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
                                         <div className="flex gap-2">
-                                          <button onClick={()=>{
+                                          <button onClick={async()=>{
                                             const d = attendanceDraft[key] || {}
                                             const next = { ...d, [u.id]: { status: "present", feedback: fb } }
                                             setAttendanceDraft(prev=>({ ...prev, [key]: next }))
+                                            try { await apiFetch(`/api/clubs/sessions/${s.id}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: 'present', feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) }
                                           }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 flex items-center gap-1"><Check className="w-3 h-3"/>Пришёл</button>
-                                          <button onClick={()=>{
+                                          <button onClick={async()=>{
                                             const d = attendanceDraft[key] || {}
                                             const next = { ...d, [u.id]: { status: "absent", feedback: fb } }
                                             setAttendanceDraft(prev=>({ ...prev, [key]: next }))
+                                            try { await apiFetch(`/api/clubs/sessions/${s.id}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: 'absent', feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) }
                                           }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 flex items-center gap-1"><X className="w-3 h-3"/>Нет</button>
                                         </div>
                                       </div>
@@ -408,6 +450,88 @@ export default function ClubsTab() {
                               </div>
                             )
                           })}
+                        </div>
+
+                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
+                          <div className="text-sm font-medium">Таблица посещаемости</div>
+                          {(() => {
+                            const colDates = Array.from(new Set(classSessions.map(s => new Date(s.date).toISOString().slice(0,10))))
+                            const dateToSession: Record<string, string> = {}
+                            for (const s of classSessions) {
+                              const iso = new Date(s.date).toISOString().slice(0,10)
+                              dateToSession[iso] = s.id
+                            }
+                            return (
+                              <div className="overflow-auto">
+                                <table className="min-w-full text-white text-sm">
+                                  <thead>
+                                    <tr>
+                                      <th className="sticky left-0 bg-[#0f0f14] px-3 py-2 text-left border-b border-[#2a2a35]">ФИО</th>
+                                      {colDates.map(d => (
+                                        <th key={d} className="px-3 py-2 text-center border-b border-[#2a2a35] whitespace-nowrap">{new Date(d).toLocaleDateString("ru-RU")}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {enrolled.map(u => (
+                                      <tr key={u.id} className="border-t border-[#2a2a35]">
+                                        <td className="sticky left-0 bg-[#0f0f14] px-3 py-2 border-r border-[#2a2a35] whitespace-nowrap">{u.fullName || u.email}</td>
+                                        {colDates.map(d => {
+                                          const sid = dateToSession[d]
+                                          const key = `${cl.id}:${sid}`
+                                          const draft = attendanceDraft[key] || {}
+                                          const checked = (draft[u.id]?.status || "absent") === "present"
+                                          return (
+                                            <td key={d} className="px-3 py-2 text-center">
+                                              <input type="checkbox" className="w-5 h-5 accent-[#00a3ff]" checked={checked} onChange={async () => {
+                                                const prev = attendanceDraft[key] || {}
+                                                const cur = (prev[u.id]?.status || 'absent') === 'present'
+                                                const nextStatus = cur ? 'absent' : 'present'
+                                                const fb = prev[u.id]?.feedback || ''
+                                                setAttendanceDraft(old => ({ ...old, [key]: { ...prev, [u.id]: { status: nextStatus, feedback: fb } } }))
+                                                try {
+                                                  await apiFetch(`/api/clubs/sessions/${sid}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: nextStatus, feedback: fb || undefined }] }) })
+                                                  toast({ title: 'Сохранено' })
+                                                } catch(e:any) {
+                                                  toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any })
+                                                }
+                                              }} />
+                                            </td>
+                                          )
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )
+                          })()}
+                          {enrolled.length>0 && (sessions[cl.id]?.length||0) > 0 && (
+                            <div className="flex justify-end">
+                              <button onClick={async()=>{
+                                try {
+                                  const colDates = Array.from(new Set((sessions[cl.id]||[]).map(s => new Date(s.date).toISOString().slice(0,10))))
+                                  const dateToSession: Record<string, string> = {}
+                                  for (const s of (sessions[cl.id]||[])) {
+                                    const iso = new Date(s.date).toISOString().slice(0,10)
+                                    dateToSession[iso] = s.id
+                                  }
+                                  await Promise.all(colDates.map(async (d) => {
+                                    const sid = dateToSession[d]
+                                    const key = `${cl.id}:${sid}`
+                                    const draft = attendanceDraft[key] || {}
+                                    const marks = Object.entries(draft).map(([studentId, v]) => ({ studentId, status: (v as any).status || "absent", feedback: (v as any).feedback || undefined }))
+                                    if (marks.length > 0) {
+                                      await apiFetch(`/api/clubs/sessions/${sid}/attendance`, { method: "POST", body: JSON.stringify({ marks }) })
+                                    }
+                                  }))
+                                  toast({ title: "Таблица сохранена" })
+                                } catch (e:any) {
+                                  toast({ title: "Ошибка", description: e?.message || "Не удалось сохранить", variant: "destructive" as any })
+                                }
+                              }} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-4 py-2 text-black font-medium">Сохранить таблицу</button>
+                            </div>
+                          )}
                         </div>
 
                         

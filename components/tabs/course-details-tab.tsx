@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { ArrowLeft, BadgeInfo, LogIn, ShoppingCart, CheckCircle, ShieldAlert, Copy } from "lucide-react"
 import { useConfirm } from "@/components/ui/confirm"
@@ -55,17 +55,9 @@ export default function CourseDetailsTab({
   const [showPayment, setShowPayment] = useState(false)
   const [canAccess, setCanAccess] = useState<boolean>(false)
   const [fullCourse, setFullCourse] = useState<CourseDetails | null>(course)
-  const [missions, setMissions] = useState<Array<{ id: string; title: string; target: number; progress: number; xpReward: number }>>([])
-  const [showGame, setShowGame] = useState(false)
-  const [gameLoading, setGameLoading] = useState(false)
-  const [gameQs, setGameQs] = useState<Array<{ id: string; text: string; options: string[]; xpReward?: number; level?: number }>>([])
-  const [qIndex, setQIndex] = useState(0)
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
-  const [answerInfo, setAnswerInfo] = useState<null | { correct: boolean; xpAwarded: number; correctIndex: number }>(null)
-  const [levelStart, setLevelStart] = useState<number | null>(null)
-  const [moduleFilterId, setModuleFilterId] = useState<string>("")
-  const [lessonFilterId, setLessonFilterId] = useState<string>("")
-  const [leaderboard, setLeaderboard] = useState<Array<{ rank: number; id: string; name: string; xp: number }>>([])
+  const [isGameOpen, setIsGameOpen] = useState(false)
+  const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({})
+  
 
   const isFree = !course?.price || course.price === 0
 
@@ -101,78 +93,23 @@ export default function CourseDetailsTab({
     return () => { ignore = true }
   }, [course?.id, isFree])
 
+  // Load lesson progress to gate next lessons
   useEffect(() => {
-    let ignore = false
-    if (!course?.id) return
-    apiFetch<any[]>(`/courses/${course.id}/missions`)
-      .then((list) => {
-        if (ignore) return
-        const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
-        setMissions(items)
+    let alive = true
+    if (!course?.id || !canAccess) { setCompletedLessons({}); return }
+    apiFetch<any>(`/courses/${course.id}/progress`)
+      .then((data) => {
+        if (!alive) return
+        const map: Record<string, boolean> = {}
+        for (const p of data?.lessons || []) {
+          if (p?.lessonId && p?.isCompleted) map[String(p.lessonId)] = true
+        }
+        setCompletedLessons(map)
       })
-      .catch(() => setMissions([]))
-    return () => { ignore = true }
-  }, [course?.id])
+      .catch(() => setCompletedLessons({}))
+    return () => { alive = false }
+  }, [course?.id, canAccess])
 
-  useEffect(() => {
-    let ignore = false
-    if (!course?.id) return
-    apiFetch<any[]>(`/courses/${course.id}/leaderboard`).then((rows)=>{
-      if (ignore) return
-      setLeaderboard((rows||[]).map((r:any)=>({ rank: r.rank, id: r.id, name: r.name, xp: Number(r.xp||0) })))
-    }).catch(()=>setLeaderboard([]))
-    return ()=>{ ignore = true }
-  }, [course?.id])
-
-  const openGame = async () => {
-    if (!course?.id) return
-    setShowGame(true)
-    setGameLoading(true)
-    setSelectedIdx(null)
-    setAnswerInfo(null)
-    setQIndex(0)
-    try {
-      const params = new URLSearchParams()
-      if (moduleFilterId) params.set('moduleId', moduleFilterId)
-      if (lessonFilterId) params.set('lessonId', lessonFilterId)
-      if (typeof levelStart === 'number') params.set('levelMin', String(levelStart))
-      const qsUrl = `/courses/${course.id}/questions${params.toString() ? `?${params.toString()}` : ''}`
-      const list = await apiFetch<any[]>(qsUrl)
-      const mapped = (list || []).map((q) => ({ id: q.id, text: q.text, options: q.options || [], xpReward: q.xpReward, level: q.level }))
-      setGameQs(mapped)
-    } catch {
-      setGameQs([])
-    } finally {
-      setGameLoading(false)
-    }
-  }
-
-  const submitAnswer = async () => {
-    if (selectedIdx === null || !gameQs[qIndex]) return
-    try {
-      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; xpAwarded: number }>(`/courses/questions/${gameQs[qIndex].id}/answer`, {
-        method: 'POST',
-        body: JSON.stringify({ selectedIndex: selectedIdx })
-      })
-      setAnswerInfo({ correct: res.isCorrect, correctIndex: res.correctIndex, xpAwarded: res.xpAwarded || 0 })
-      if (res.xpAwarded > 0) toast({ title: `+${res.xpAwarded} XP`, description: 'Ответ верный' })
-      // refresh missions progress after answer
-      if (course?.id) {
-        apiFetch<any[]>(`/courses/${course.id}/missions`).then((list)=>{
-          const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
-          setMissions(items)
-        }).catch(()=>{})
-      }
-    } catch (e: any) {
-      toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответ', variant: 'destructive' as any })
-    }
-  }
-
-  const nextQuestion = () => {
-    setSelectedIdx(null)
-    setAnswerInfo(null)
-    setQIndex((i) => i + 1)
-  }
 
   const handlePurchase = () => {
     if (!user || !course) { toast({ title: "Войдите", description: "Войдите чтобы купить курс" }); return }
@@ -217,165 +154,17 @@ export default function CourseDetailsTab({
           <BadgeInfo className="w-5 h-5 text-[#a0a0b0]" />
           <span>Курс не найден. Вернитесь назад и выберите курс.</span>
         </div>
-
-      <div className="mt-10">
-        <button
-          onClick={() => canAccess && onOpenLesson?.(activeModule.id, activeModule?.lessons?.[0]?.id ?? 0)}
-          disabled={!canAccess}
-          className="w-full rounded-full h-12 bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold disabled:opacity-50"
-        >
-          Продолжить
-        </button>
-      </div>
       </div>
     )
   }
 
   const viewCourse = fullCourse || course
   const activeModule = viewCourse.modules.find((m) => String(m.id) === String(activeModuleId)) || viewCourse.modules[0]
-  const xpTarget = useMemo(() => {
-    const sum = (missions || []).reduce((acc, m) => acc + (Number(m.xpReward || 0)), 0)
-    return sum > 0 ? sum : 100
-  }, [missions])
-  const currentXp = Math.max(0, Number(user?.xp || 0))
-  const xpProgress = xpTarget > 0 ? Math.min(100, Math.round((currentXp % xpTarget) / xpTarget * 100)) : 0
+  const firstIncompleteInModule = (activeModule?.lessons || []).find((l) => !completedLessons[String(l.id)])
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      {/* Gamification header */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 mb-8">
-        <div className="relative bg-transparent">
-          <div className="flex gap-6">
-            <div className="w-16 bg-[#16161c] border border-[#2a2a35] rounded-2xl p-3 flex flex-col items-center justify-between">
-              <div className="text-white/60 text-xs text-center">До получения сертификата</div>
-              <div className="text-white font-bold text-lg">{xpTarget}xp</div>
-              <div className="h-64 w-2 bg-[#0f0f14] rounded-full overflow-hidden my-3 border border-[#2a2a35]">
-                <div className="bg-[#00a3ff] w-full" style={{ height: `${xpProgress}%` }} />
-              </div>
-            </div>
-            <div className="relative flex-1 min-h-[280px]">
-              {(missions.slice(0, 6)).map((m, i) => (
-                <div
-                  key={i}
-                  className="absolute w-16 h-16 md:w-20 md:h-20 rounded-full bg-[#16161c] border border-[#2a2a35] text-white flex items-center justify-center shadow-sm"
-                  style={{ left: `${i * 12}%`, top: `${i * 12}%` }}
-                >
-                  <div className="text-center leading-tight">
-                    <div className="text-sm">{i + 1}</div>
-                    <div className="text-[10px] text-[#00a3ff]">+{m.xpReward ?? 0}xp</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <aside>
-          <div className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-5 text-white">
-            <div className="text-white/80 text-sm mb-2">Ежедневные миссии</div>
-            {missions.length === 0 ? (
-              <div className="text-white/60 text-sm">Миссии пока не добавлены</div>
-            ) : (
-              <div className="space-y-3">
-                {missions.slice(0,3).map((m,i)=>{
-                  const pct = Math.min(100, Math.round((Number(m.progress)/Math.max(1, Number(m.target))) * 100))
-                  return (
-                    <div key={m.id} className="rounded-xl bg-[#0f0f14] border border-[#2a2a35] p-4">
-                      <div className="font-semibold mb-1 truncate">{m.title}</div>
-                      <div className="text-white/60 text-xs mb-2">Прогресс: {m.progress}/{m.target}</div>
-                      <div className="h-2 w-full bg-[#1b1b22] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#00a3ff]" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="text-[#00a3ff] text-xs mt-2">+{m.xpReward}xp</div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-      {showGame && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 animate-fade-in" onClick={() => setShowGame(false)}>
-          <div className="w-full max-w-2xl bg-[#16161c] border border-[#2a2a35] rounded-2xl p-6 text-white animate-slide-up" onClick={(e)=>e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-lg font-medium">Игровой режим</div>
-              <button onClick={() => setShowGame(false)} className="text-white/70 hover:text-white">Закрыть</button>
-            </div>
-            {gameLoading ? (
-              <div className="text-white/60">Загрузка...</div>
-            ) : gameQs.length === 0 ? (
-              <div>
-                <div className="text-white/60">Вопросов пока нет</div>
-                <div className="mt-4 text-right">
-                  <button onClick={()=>setShowGame(false)} className="rounded-lg bg-[#2a2a35] hover:bg-[#333344] px-4 py-2">Ок</button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-white/70">Вопрос {qIndex + 1} из {gameQs.length}</div>
-                  <div className="text-xs text-white/50 flex items-center gap-3">
-                    {typeof gameQs[qIndex].level === 'number' && <span className="rounded-full bg-[#0f0f14] border border-[#2a2a35] px-2 py-1">Уровень: {gameQs[qIndex].level}</span>}
-                    {typeof gameQs[qIndex].xpReward === 'number' && <span className="rounded-full bg-[#0f0f14] border border-[#2a2a35] px-2 py-1">+{gameQs[qIndex].xpReward} XP</span>}
-                  </div>
-                </div>
-                <div className="text-base font-medium">{gameQs[qIndex].text}</div>
-                <div className="grid grid-cols-1 gap-2">
-                  {gameQs[qIndex].options.map((opt, i) => {
-                    const isSelected = selectedIdx === i
-                    const isAnswered = !!answerInfo
-                    const isCorrect = isAnswered && i === (answerInfo?.correctIndex ?? -1)
-                    const isWrongSelection = isAnswered && isSelected && !isCorrect
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => !isAnswered && setSelectedIdx(i)}
-                        className={`text-left rounded-lg px-4 py-3 border transition ${
-                          isCorrect ? 'border-[#22c55e] bg-[#22c55e]/10' : isWrongSelection ? 'border-[#ef4444] bg-[#ef4444]/10' : isSelected ? 'border-[#00a3ff] bg-[#00a3ff]/10' : 'border-[#2a2a35] hover:bg-[#1b1b22]'
-                        }`}
-                        disabled={isAnswered}
-                      >
-                        {opt}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  {!answerInfo ? (
-                    <button onClick={submitAnswer} disabled={selectedIdx===null} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2 disabled:opacity-50">Ответить</button>
-                  ) : qIndex < gameQs.length - 1 ? (
-                    <button onClick={nextQuestion} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] text-white px-4 py-2">Далее</button>
-                  ) : (
-                    <button onClick={()=>setShowGame(false)} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2">Завершить</button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-            {user?.role === 'admin' && (
-              <button
-                onClick={() => {
-                  if (!course?.id) return
-                  const title = prompt('Название ежедневной миссии? (например: Ответь правильно 5 раз сегодня)') || 'Ежедневная миссия'
-                  const target = Number(prompt('Цель (кол-во):', '5') || '5')
-                  const xp = Number(prompt('XP за выполнение (по умолчанию 100):', '100') || '100')
-                  apiFetch(`/courses/${course.id}/missions`, {
-                    method: 'POST',
-                    body: JSON.stringify({ title, target, xpReward: xp })
-                  }).then(() => apiFetch<any[]>(`/courses/${course.id}/missions`))
-                    .then((list) => {
-                      const items = (list || []).map((m: any) => ({ id: m.id, title: m.title, target: Number(m.target||1), progress: Number(m.progress||0), xpReward: Number(m.xpReward||0) }))
-                      setMissions(items)
-                    })
-                }}
-                className="mt-4 w-full rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium py-2"
-              >
-                Добавить миссию
-              </button>
-            )}
-          </div>
-        </aside>
-      </div>
+      
       <div className="mb-6 flex items-center gap-2 text-white">
         <button
           onClick={onBack}
@@ -430,41 +219,20 @@ export default function CourseDetailsTab({
                 </div>
               </div>
             )}
+
+            {canAccess && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setIsGameOpen(true)}
+                  className="w-full rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold py-3"
+                >
+                  Игра
+                </button>
+              </div>
+            )}
           </div>
 
-          {canAccess && (
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
-                  <div className="text-white/60 text-xs mb-1">Уровень от</div>
-                  <select value={String(levelStart ?? '')} onChange={(e)=> setLevelStart(e.target.value? Number(e.target.value): null)} className="w-full bg-transparent text-white text-sm outline-none">
-                    <option value="" className="bg-[#0f0f14]">Все уровни</option>
-                    {Array.from({length:10}).map((_,i)=> <option key={i+1} value={i+1} className="bg-[#0f0f14]">{i+1}</option>)}
-                  </select>
-                </div>
-                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
-                  <div className="text-white/60 text-xs mb-1">Модуль</div>
-                  <select value={moduleFilterId} onChange={(e)=>{ setModuleFilterId(e.target.value); setLessonFilterId('') }} className="w-full bg-transparent text-white text-sm outline-none">
-                    <option value="" className="bg-[#0f0f14]">Все модули</option>
-                    {viewCourse.modules.map((m)=> <option key={m.id} value={String(m.id)} className="bg-[#0f0f14]">{m.title}</option>)}
-                  </select>
-                </div>
-                <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg px-3 py-2">
-                  <div className="text-white/60 text-xs mb-1">Урок</div>
-                  <select value={lessonFilterId} onChange={(e)=> setLessonFilterId(e.target.value)} disabled={!moduleFilterId} className="w-full bg-transparent text-white text-sm outline-none disabled:opacity-50">
-                    <option value="" className="bg-[#0f0f14]">Все уроки</option>
-                    {(moduleFilterId ? (viewCourse.modules.find((m)=> String(m.id)===String(moduleFilterId))?.lessons||[]) : []).map((l)=> <option key={l.id} value={String(l.id)} className="bg-[#0f0f14]">{l.title}</option>)}
-                  </select>
-                </div>
-              </div>
-              <button
-                onClick={openGame}
-                className="w-full rounded-full h-12 bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold"
-              >
-                Игра
-              </button>
-            </div>
-          )}
+          
 
           
           <div className="space-y-3">
@@ -501,51 +269,94 @@ export default function CourseDetailsTab({
             </div>
           </div>
 
-          <div className="bg-[#16161c] border border-[#636370]/20 rounded-2xl p-4 text-white">
-            <div className="text-white/80 text-sm mb-2">Лидерборд</div>
-            {leaderboard.length === 0 ? (
-              <div className="text-white/60 text-sm">Нет данных</div>
-            ) : (
-              <div className="space-y-2">
-                {leaderboard.slice(0,5).map((u)=> (
-                  <div key={u.id} className="flex items-center justify-between bg-[#0f0f14] border border-[#2a2a35] rounded-full px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#00a3ff] text-black text-xs font-bold flex items-center justify-center">{u.rank}</div>
-                      <div className="text-sm">{u.name}</div>
-                    </div>
-                    <div className="text-[#00a3ff] text-xs">{u.xp} XP</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-        
           <div className="space-y-3">
-            {activeModule?.lessons.map((lesson, lesIdx) => (
-              <button
-                key={lesson.id}
-                onClick={() => canAccess ? onOpenLesson?.(activeModule.id, lesson.id) : setShowPayment(true)}
-                disabled={!canAccess}
-                className={`w-full flex items-center justify-between bg-[#16161c] border border-[#636370]/20 rounded-full px-4 py-3 text-white hover:bg-[#1b1b22] transition-colors ${!canAccess ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#00a3ff] text-black flex items-center justify-center font-semibold">
-                    {lesIdx + 1}
+            {activeModule?.lessons.map((lesson, lesIdx) => {
+              const unlocked = canAccess && (completedLessons[String(lesson.id)] || !firstIncompleteInModule || String(lesson.id) === String(firstIncompleteInModule.id))
+              return (
+                <button
+                  key={lesson.id}
+                  onClick={() => unlocked ? onOpenLesson?.(activeModule.id, lesson.id) : setShowPayment(true)}
+                  disabled={!unlocked}
+                  className={`w-full flex items-center justify-between bg-[#16161c] border border-[#636370]/20 rounded-full px-4 py-3 text-white transition-colors ${unlocked ? 'hover:bg-[#1b1b22]' : 'opacity-50 cursor-not-allowed'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#00a3ff] text-black flex items-center justify-center font-semibold">
+                      {lesIdx + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium">{lesson.title}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-medium">{lesson.title}</div>
-                  </div>
-                </div>
-                <div className="text-white/60 text-sm">{lesson.time ?? "10:21"}</div>
-              </button>
-            ))}
+                  <div className="text-white/60 text-sm">{lesson.time ?? "10:21"}</div>
+                </button>
+              )
+            })}
           </div>
           
         </aside>
       </div>
 
       
+      {isGameOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 bg-black/70">
+          <div className="absolute inset-0 p-6 md:p-10">
+            <div className="h-full w-full bg-[#0f0f14] border border-[#2a2a35] rounded-2xl text-white relative overflow-hidden">
+              <button onClick={() => setIsGameOpen(false)} className="absolute top-3 right-3 rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1 text-sm">Закрыть</button>
+              <div className="flex h-full">
+                <div className="hidden md:flex flex-col items-center justify-center w-28 p-4 border-r border-[#2a2a35]">
+                  <div className="text-xs text-white/60 mb-1 text-center">До сертификата</div>
+                  <div className="text-lg font-semibold mb-3">100xp</div>
+                  <div className="h-64 w-2 rounded-full bg-[#1b1b22] overflow-hidden">
+                    <div className="w-2 bg-[#00a3ff]" style={{ height: '30%' }}></div>
+                  </div>
+                </div>
+                <div className="flex-1 relative">
+                  <div className="absolute inset-0 p-6">
+                    {((activeModule?.lessons || []).length === 0) && (
+                      <div className="text-white/60">Уроков нет</div>
+                    )}
+                    {(activeModule?.lessons || []).map((lesson, i) => {
+                      const top = 40 + i * 80
+                      const left = 40 + ((i % 2) * 160)
+                      const unlocked = canAccess && (completedLessons[String(lesson.id)] || !firstIncompleteInModule || String(lesson.id) === String(firstIncompleteInModule.id))
+                      return (
+                        <button
+                          key={lesson.id}
+                          style={{ position: 'absolute', top, left }}
+                          onClick={() => { if (unlocked) { setIsGameOpen(false); onOpenLesson?.(activeModule.id, lesson.id) } else { setShowPayment(true) }}}
+                          disabled={!unlocked}
+                          className={`w-16 h-16 rounded-full bg-[#16161c] border border-[#2a2a35] text-white/90 flex items-center justify-center shadow-lg ${unlocked ? 'hover:bg-[#1b1b22] transition-colors' : 'opacity-50 cursor-not-allowed'}`}
+                        >
+                          <div className="text-center">
+                            <div className="text-lg leading-none">{i + 1}</div>
+                            <div className="text-[10px] text-[#00a3ff]">+20xp</div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                    <div className="absolute left-0 right-0 bottom-8 flex justify-center">
+                      <button
+                        onClick={() => {
+                          const first = firstIncompleteInModule || activeModule?.lessons?.[0]
+                          if (!first) return 
+                          if (!canAccess) { setShowPayment(true); return }
+                          setIsGameOpen(false)
+                          onOpenLesson?.(activeModule.id, first.id)
+                        }}
+                        className="w-full max-w-3xl rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-semibold py-4"
+                      >
+                        Продолжить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {showPayment && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-fade-in">
           <div className="w-full max-w-md bg-[#16161c] border border-[#2a2a35] rounded-2xl p-6 text-white animate-slide-up">

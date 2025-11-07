@@ -45,6 +45,8 @@ export default function CourseLessonTab({
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
   const { user } = useAuth()
   const [canAccess, setCanAccess] = useState<boolean>(false)
+  const [marking, setMarking] = useState(false)
+  const [completed, setCompleted] = useState(false)
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -86,6 +88,28 @@ export default function CourseLessonTab({
   const [lessonContent, setLessonContent] = useState<string>(lesson?.content || "")
   const [lessonQuiz, setLessonQuiz] = useState<Array<any>>([])
   const [loadingQuiz, setLoadingQuiz] = useState(false)
+
+  const allAnswered = Array.isArray(lessonQuiz) && lessonQuiz.length > 0 && lessonQuiz.every((q: any) => typeof q.selectedIndex === 'number')
+  const correctCount = (lessonQuiz || []).filter((q: any) => q.isCorrect).length
+  const totalCount = (lessonQuiz || []).length
+  const ratio = totalCount > 0 ? correctCount / totalCount : 0
+  const pass = ratio >= 0.75
+
+  const finalizeLesson = async () => {
+    if (!course?.id || !lesson?.id) return
+    if (!allAnswered) { toast({ title: 'Ответьте на все вопросы', description: 'Пожалуйста, завершите тест', variant: 'destructive' as any }); return }
+    if (!pass) { toast({ title: 'Недостаточно правильных ответов', description: 'Нужно 75% и выше', variant: 'destructive' as any }); return }
+    try {
+      setMarking(true)
+      await apiFetch(`/courses/${course.id}/lessons/${lesson.id}/progress`, { method: 'POST', body: JSON.stringify({ isCompleted: true }) })
+      setCompleted(true)
+      toast({ title: 'Урок завершён', description: 'Прогресс сохранён' })
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось сохранить прогресс', variant: 'destructive' as any })
+    } finally {
+      setMarking(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -290,6 +314,21 @@ export default function CourseLessonTab({
                         </div>
                       </div>
                     ))}
+                    <div className="pt-2 border-t border-[#2a2a35] text-sm text-white/80 flex items-center justify-between">
+                      <div>
+                        Результат: {correctCount}/{totalCount} ({Math.round(ratio*100)}%)
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!completed && (
+                          <button onClick={finalizeLesson} disabled={!allAnswered || marking} className={`rounded-full px-4 py-2 text-black font-medium ${allAnswered ? 'bg-[#00a3ff] hover:bg-[#0088cc]' : 'bg-[#2a2a35] opacity-60 cursor-not-allowed'}`}>
+                            {marking ? 'Сохранение...' : 'Завершить урок'}
+                          </button>
+                        )}
+                        {completed && (
+                          <span className="inline-flex items-center rounded-full px-3 py-1 bg-[#1b1b22] border border-[#2a2a35]">Урок пройден</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

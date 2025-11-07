@@ -50,7 +50,7 @@ const questionSchema = z.object({
   text: z.string().min(1),
   options: z.array(z.string().min(1)).min(2).max(8),
   correctIndex: z.number().int().min(0),
-  xpReward: z.number().int().min(0).max(10000).optional().default(100),
+  xpReward: z.number().int().min(0).max(10000).optional().default(20),
   level: z.number().int().min(1).max(10).optional().default(1),
   moduleId: z.string().optional(),
   lessonId: z.string().optional(),
@@ -114,7 +114,9 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   })
   let awarded = 0
   if (isCorrect) {
-    awarded = Number(q.xpReward ?? 100)
+    // Unified reward for correct answer
+    const reward = 20
+    awarded = reward
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
     // increment daily missions progress for this course (type: correct_answers)
     try {

@@ -141,7 +141,7 @@ function DashboardInner() {
       case "bytesize":
         return "Byte Size"
       case "clubs":
-        return "Кружок"
+        return "Кружки"
       default:
         return "Главная"
     }

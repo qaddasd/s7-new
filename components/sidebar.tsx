@@ -52,7 +52,7 @@ export default function Sidebar({
   const navItems = [
     { id: "home", label: "Главная", icon: Home, href: "/dashboard?tab=home" },
     { id: "courses", label: "Курсы", icon: BookOpen, href: "/dashboard?tab=courses" },
-    { id: "kruzhok", label: "Кружок", icon: Calendar, href: "/kruzhok" },
+    { id: "clubs", label: "Кружки", icon: Calendar, href: "/dashboard?tab=clubs" },
     { id: "s7-tools", label: "S7 Tools", icon: Wrench, href: "/dashboard?tab=s7-tools" },
     { id: "teams", label: "Команда", icon: Users, href: "/dashboard?tab=teams" },
     { id: "profile", label: "Профиль", icon: User, href: "/dashboard?tab=profile" },

@@ -17,6 +17,7 @@ export default function ForgotPasswordPage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [countdown, setCountdown] = useState(0)
+  const [resetToken, setResetToken] = useState("")
 
   // Countdown timer for resend button
   useEffect(() => {
@@ -77,7 +78,26 @@ export default function ForgotPasswordPage() {
       return
     }
 
-    setStep("reset")
+    setLoading(true)
+    try {
+      const response = await fetch("/api/auth/verify-reset-code", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, code })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Неверный или просроченный код")
+      }
+      if (!data.resetToken) throw new Error("Токен сброса не получен")
+      setResetToken(String(data.resetToken))
+      toast({ title: "Код подтвержден" })
+      setStep("reset")
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Не удалось подтвердить код", variant: "destructive" as any })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleResetPassword = async () => {
@@ -108,32 +128,26 @@ export default function ForgotPasswordPage() {
       return
     }
 
+    if (!resetToken) {
+      toast({ title: "Ошибка", description: "Сначала подтвердите код", variant: "destructive" as any })
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await fetch("/api/auth/reset-password", {
+      const response = await fetch("/api/auth/reset-password/confirm", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, code, newPassword })
+        body: JSON.stringify({ email, resetToken, newPassword })
       })
-      
       const data = await response.json()
-      
       if (!response.ok) {
         throw new Error(data.error || "Ошибка сброса пароля")
       }
-      
-      toast({ 
-        title: "Успешно", 
-        description: "Пароль успешно изменен" 
-      })
-      
+      toast({ title: "Успешно", description: "Пароль успешно изменен" })
       router.push("/")
     } catch (e: any) {
-      toast({ 
-        title: "Ошибка", 
-        description: e?.message || "Не удалось сбросить пароль", 
-        variant: "destructive" as any 
-      })
+      toast({ title: "Ошибка", description: e?.message || "Не удалось сбросить пароль", variant: "destructive" as any })
     } finally {
       setLoading(false)
     }

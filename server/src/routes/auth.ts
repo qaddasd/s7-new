@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express"
 import { z } from "zod"
 import { prisma } from "../db"
+import { randomBytes } from "crypto"
 import { hashPassword, verifyPassword } from "../utils/password"
 import { signAccessToken, signRefreshToken, verifyToken } from "../utils/jwt"
 import { requireAuth } from "../middleware/auth"
@@ -15,6 +16,7 @@ const registerSchema = z.object({
   educationalInstitution: z.string().optional(),
   primaryRole: z.string().optional(),
 })
+
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -36,6 +38,17 @@ const passwordResetSchema = z.object({
   newPassword: z.string().min(8),
 })
 
+const verifyResetSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6), // 6-digit format
+})
+
+const passwordResetConfirmSchema = z.object({
+  email: z.string().email(),
+  resetToken: z.string().min(16),
+  newPassword: z.string().min(8),
+})
+
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8),
@@ -49,6 +62,8 @@ export const router = Router()
 
 // Store verification codes in memory (in production, use Redis or database)
 const verificationCodes = new Map<string, { code: string; expiresAt: Date; type: 'verification' | 'password-reset'; attempts: number }>()
+// Store short-lived reset tokens issued after code verification
+const passwordResetTokens = new Map<string, { token: string; expiresAt: Date }>()
 
 // Очистка истекших кодов каждые 10 минут
 setInterval(() => {
@@ -56,6 +71,11 @@ setInterval(() => {
   for (const [email, data] of verificationCodes.entries()) {
     if (data.expiresAt < now) {
       verificationCodes.delete(email)
+    }
+  }
+  for (const [email, data] of passwordResetTokens.entries()) {
+    if (data.expiresAt < now) {
+      passwordResetTokens.delete(email)
     }
   }
 }, 10 * 60 * 1000)
@@ -471,6 +491,52 @@ router.post("/forgot-password", async (req: Request, res: Response) => {
   }
 })
 
+// Verify 6-digit reset code and issue short-lived reset token
+router.post("/verify-reset-code", async (req: Request, res: Response) => {
+  const parsed = verifyResetSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { email, code } = parsed.data
+
+  try {
+    // Check if code exists and is valid
+    const stored = verificationCodes.get(email)
+    if (!stored || stored.type !== 'password-reset') {
+      return res.status(400).json({ error: "Reset code not found or expired" })
+    }
+
+    // Check if code is expired
+    if (stored.expiresAt < new Date()) {
+      verificationCodes.delete(email)
+      return res.status(400).json({ error: "Reset code expired" })
+    }
+
+    // Check attempts (max 3 attempts)
+    if (stored.attempts >= 3) {
+      verificationCodes.delete(email)
+      return res.status(400).json({ error: "Too many failed attempts. Please request a new code." })
+    }
+
+    // Increment attempts
+    stored.attempts += 1
+    verificationCodes.set(email, stored)
+
+    // Check if code matches
+    if (stored.code !== code) {
+      return res.status(400).json({ error: "Invalid reset code" })
+    }
+
+    // Code is valid, remove it and issue reset token
+    verificationCodes.delete(email)
+    const token = randomBytes(24).toString("hex")
+    passwordResetTokens.set(email, { token, expiresAt: new Date(Date.now() + 15 * 60 * 1000) })
+
+    res.json({ success: true, resetToken: token, expiresInSeconds: 15 * 60 })
+  } catch (error) {
+    console.error("Failed to verify reset code:", error)
+    res.status(500).json({ error: "Failed to verify reset code" })
+  }
+})
+
 // Password reset with attempt limiting
 router.post("/reset-password", async (req: Request, res: Response) => {
   const parsed = passwordResetSchema.safeParse(req.body)
@@ -515,6 +581,32 @@ router.post("/reset-password", async (req: Request, res: Response) => {
       data: { passwordHash }
     })
 
+    res.json({ success: true, message: "Password reset successfully" })
+  } catch (error) {
+    console.error("Failed to reset password:", error)
+    res.status(500).json({ error: "Failed to reset password" })
+  }
+})
+
+// Confirm password reset with short-lived reset token
+router.post("/reset-password/confirm", async (req: Request, res: Response) => {
+  const parsed = passwordResetConfirmSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const { email, resetToken, newPassword } = parsed.data
+
+  try {
+    const stored = passwordResetTokens.get(email)
+    if (!stored) return res.status(400).json({ error: "Reset token not found or expired" })
+    if (stored.expiresAt < new Date()) {
+      passwordResetTokens.delete(email)
+      return res.status(400).json({ error: "Reset token expired" })
+    }
+    if (stored.token !== resetToken) return res.status(400).json({ error: "Invalid reset token" })
+
+    passwordResetTokens.delete(email)
+
+    const passwordHash = await hashPassword(newPassword)
+    await prisma.user.update({ where: { email }, data: { passwordHash } })
     res.json({ success: true, message: "Password reset successfully" })
   } catch (error) {
     console.error("Failed to reset password:", error)
