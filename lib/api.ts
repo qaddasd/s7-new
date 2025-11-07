@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 const ACCESS_TOKEN_KEY = "s7.accessToken"
 const REFRESH_TOKEN_KEY = "s7.refreshToken"
@@ -74,13 +74,20 @@ function deleteCookie(name: string) {
 
 async function refreshTokens(currentRefresh: string): Promise<Tokens | null> {
   try {
-    let res = await fetch("/auth/refresh", {
+    const apiUrl = typeof window !== 'undefined' && (window as any).ENV_API_URL 
+      ? (window as any).ENV_API_URL 
+      : (process.env.NEXT_PUBLIC_API_URL || '')
+    
+    const authPath = apiUrl ? `${apiUrl}/auth/refresh` : "/auth/refresh"
+    const fallbackPath = apiUrl ? `${apiUrl}/api/auth/refresh` : "/api/auth/refresh"
+    
+    let res = await fetch(authPath, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ refreshToken: currentRefresh }),
     })
     if (!res.ok) {
-      res = await fetch("/api/auth/refresh", {
+      res = await fetch(fallbackPath, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ refreshToken: currentRefresh }),
@@ -102,7 +109,13 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   if (tokens?.accessToken) headers.set("authorization", `Bearer ${tokens.accessToken}`)
   if (!headers.has("cache-control")) headers.set("cache-control", "no-cache")
 
-  const doFetch = async (): Promise<Response> => fetch(path, { ...init, headers, cache: "no-store" })
+  // Используем NEXT_PUBLIC_API_URL если он указан, иначе относительный путь (для dev с rewrites)
+  const apiUrl = typeof window !== 'undefined' && (window as any).ENV_API_URL 
+    ? (window as any).ENV_API_URL 
+    : (process.env.NEXT_PUBLIC_API_URL || '')
+  const fullPath = apiUrl ? `${apiUrl}${path}` : path
+
+  const doFetch = async (): Promise<Response> => fetch(fullPath, { ...init, headers, cache: "no-store" })
 
   let res = await doFetch()
   if (res.status === 401 && tokens?.refreshToken) {

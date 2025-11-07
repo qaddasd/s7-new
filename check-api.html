@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Проверка API</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0f;
+            color: #fff;
+        }
+        h1 {
+            color: #00a3ff;
+        }
+        .test {
+            background: #16161c;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #2a2a35;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .success {
+            background: #0a4;
+            color: #fff;
+        }
+        .error {
+            background: #a33;
+            color: #fff;
+        }
+        .pending {
+            background: #666;
+            color: #fff;
+        }
+        pre {
+            background: #0a0a0f;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #00a3ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0088cc;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Диагностика API подключения</h1>
+    <p>Эта страница проверяет доступность backend API</p>
+    
+    <div>
+        <button onclick="runTests()">Запустить тесты</button>
+        <button onclick="location.reload()">Обновить</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const tests = [
+            {
+                name: 'Относительный путь /api/health',
+                url: '/api/health',
+                expected: 'ok'
+            },
+            {
+                name: 'Относительный путь /auth/health',
+                url: '/auth/health',
+                expected: 'ok'
+            },
+            {
+                name: 'localhost:4000 (если на dev)',
+                url: 'http://localhost:4000/api/health',
+                expected: 'ok'
+            },
+            {
+                name: 'Проверка CORS',
+                url: '/api/health',
+                method: 'OPTIONS',
+                expected: 'ok'
+            }
+        ];
+
+        async function runTest(test) {
+            const resultDiv = document.getElementById(`test-${tests.indexOf(test)}`);
+            resultDiv.querySelector('.status').textContent = '⏳ Проверка...';
+            resultDiv.querySelector('.status').className = 'status pending';
+            
+            try {
+                const startTime = Date.now();
+                const response = await fetch(test.url, {
+                    method: test.method || 'GET',
+                    cache: 'no-store'
+                });
+                const duration = Date.now() - startTime;
+                
+                let data;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+                
+                const success = response.ok;
+                
+                resultDiv.querySelector('.status').textContent = success ? '✅ Успех' : '❌ Ошибка';
+                resultDiv.querySelector('.status').className = success ? 'status success' : 'status error';
+                
+                resultDiv.querySelector('pre').textContent = JSON.stringify({
+                    status: response.status,
+                    statusText: response.statusText,
+                    duration: `${duration}ms`,
+                    data: data
+                }, null, 2);
+            } catch (error) {
+                resultDiv.querySelector('.status').textContent = '❌ Ошибка';
+                resultDiv.querySelector('.status').className = 'status error';
+                resultDiv.querySelector('pre').textContent = `Ошибка: ${error.message}\n\n` +
+                    `Возможные причины:\n` +
+                    `1. Backend не запущен\n` +
+                    `2. Неправильный порт\n` +
+                    `3. CORS ограничения\n` +
+                    `4. Nginx не настроен`;
+            }
+        }
+
+        function createTestElement(test, index) {
+            const div = document.createElement('div');
+            div.className = 'test';
+            div.id = `test-${index}`;
+            div.innerHTML = `
+                <strong>${test.name}</strong>
+                <span class="status pending">Ожидание</span>
+                <div style="margin-top: 10px; font-size: 14px; opacity: 0.7;">
+                    ${test.method || 'GET'} ${test.url}
+                </div>
+                <pre>Ожидание запуска теста...</pre>
+            `;
+            return div;
+        }
+
+        function runTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            
+            tests.forEach((test, index) => {
+                resultsDiv.appendChild(createTestElement(test, index));
+            });
+            
+            tests.forEach((test, index) => {
+                setTimeout(() => runTest(test), index * 1000);
+            });
+        }
+
+        // Показываем информацию о текущем окружении
+        window.addEventListener('DOMContentLoaded', () => {
+            const info = document.createElement('div');
+            info.className = 'test';
+            info.innerHTML = `
+                <strong>Информация об окружении</strong>
+                <pre>${JSON.stringify({
+                    currentUrl: window.location.href,
+                    hostname: window.location.hostname,
+                    port: window.location.port || '(default)',
+                    protocol: window.location.protocol,
+                    userAgent: navigator.userAgent.substring(0, 100) + '...'
+                }, null, 2)}</pre>
+            `;
+            document.getElementById('results').appendChild(info);
+        });
+    </script>
+</body>
+</html>

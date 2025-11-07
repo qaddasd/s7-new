@@ -1,0 +1,37 @@
+fix: Add production deployment support for s7robotics.space
+
+## Problem
+Application shows "Loading..." on production (s7robotics.space) because Next.js rewrites only work as proxy in dev mode, not in production.
+
+## Solution
+- Updated `lib/api.ts` to support NEXT_PUBLIC_API_URL environment variable
+- API requests now use full backend URL if configured, otherwise relative paths (for dev)
+- Added comprehensive deployment documentation and scripts
+
+## Changes
+- lib/api.ts: Add NEXT_PUBLIC_API_URL support for apiFetch and refreshTokens
+- nginx.conf.example: Production-ready nginx configuration
+- setup-production.sh: Automated production setup script
+- update.sh: Quick update script for deployments
+- DEPLOYMENT.md: Full deployment guide
+- QUICK-FIX.md: Quick troubleshooting guide
+- SERVER-CHECKLIST.md: Fast checklist for server setup
+- SOLUTION-SUMMARY.md: Problem analysis and solution summary
+- check-api.html: API diagnostics page
+- README.MD: Updated with deployment instructions
+
+## How to Fix on Server
+```bash
+git pull
+sudo cp nginx.conf.example /etc/nginx/sites-available/s7robotics.space
+sudo ln -sf /etc/nginx/sites-available/s7robotics.space /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+## Verification
+- Open https://s7robotics.space/check-api.html
+- All tests should pass ✅
+- Dashboard should load (not stuck on "Loading...")
+
+Closes: Production deployment issue
+See: SERVER-CHECKLIST.md for quick setup
