@@ -16,7 +16,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
     { href: "/admin", label: "Главная", icon: Home },
     { href: "/admin/courses", label: "Курсы", icon: BookOpen },
     { href: "/admin/games", label: "Игры", icon: Gamepad2 },
-    { href: "/admin/kruzhok", label: "Кружки", icon: GraduationCap },
+    { href: "/admin/clubs", label: "Кружки", icon: GraduationCap },
     { href: "/admin/users", label: "Пользователи", icon: Users },
     { href: "/admin/payments", label: "Платежи", icon: CreditCard },
     { href: "/admin/teams", label: "Команды", icon: Users },

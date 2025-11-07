@@ -1,5 +1,5 @@
 "use client"
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { ArrowUpRight, LogIn, Trash } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { listCourses, saveCourses } from "@/lib/s7db"
@@ -35,6 +35,7 @@ export default function Page() {
   const [difficulty, setDifficulty] = useState<string>("Легкий")
   const [showFilters, setShowFilters] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const draftId = useMemo(() => {
     if (draftParam) return draftParam
@@ -126,6 +127,88 @@ export default function Page() {
     }
   }
 
+  const buildPayload = (mods: any[]) => {
+    return {
+      title: (title || "Черновик").trim() || "Черновик",
+      description: (title || "Черновик").trim() || "Черновик",
+      difficulty: (difficulty || "Легкий").trim() || "Легкий",
+      price: free ? 0 : Number(price || 0),
+      isFree: free,
+      isPublished: false,
+      modules: (mods || []).map((m: any, mi: number) => ({
+        ...(typeof m.remoteId === 'string' && m.remoteId ? { id: m.remoteId } : {}),
+        title: m.title || `Модуль ${mi + 1}`,
+        orderIndex: mi,
+        lessons: (m.lessons || []).map((l: any, li: number) => ({
+          ...(typeof l.remoteId === 'string' && l.remoteId ? { id: l.remoteId } : {}),
+          title: l.title || `Урок ${li + 1}`,
+          duration: l.time || l.duration || undefined,
+          orderIndex: li,
+          isFreePreview: false,
+          content: l.content || undefined,
+          contentType: "text",
+          videoUrl: l.videoUrl || undefined,
+          presentationUrl: l.presentationUrl || undefined,
+          slides: Array.isArray(l.slideUrls) && l.slideUrls.length ? l.slideUrls.map((u: string) => ({ url: u })) : undefined,
+        }))
+      })),
+    }
+  }
+
+  const persistToServer = async () => {
+    try {
+      // read latest draft to include lessons/media
+      const fromKey = draftKey ? localStorage.getItem(draftKey) : null
+      const draft = fromKey ? JSON.parse(fromKey) : null
+      const mods = draft?.modules && draft.modules.length ? draft.modules : modules.map((m) => ({ id: m.id, title: m.title, lessons: [] }))
+      const payload = buildPayload(mods)
+      if (editId) {
+        await apiFetch(`/api/admin/courses/${encodeURIComponent(editId)}?sync=ids`, { method: "PUT", body: JSON.stringify(payload) })
+      } else {
+        const created = await apiFetch<any>("/api/admin/courses", { method: "POST", body: JSON.stringify(payload) })
+        if (created?.id) {
+          // put new edit id into URL and seed draft with courseId and remote IDs
+          const qs2 = new URLSearchParams(search.toString())
+          qs2.set("edit", created.id)
+          if (draftId) qs2.set("draft", draftId)
+          router.replace(`/admin/courses/new?${qs2.toString()}`)
+          try {
+            const existingRaw = draftKey ? localStorage.getItem(draftKey) : localStorage.getItem("s7_admin_course_draft")
+            const d = existingRaw ? JSON.parse(existingRaw) : {}
+            d.courseId = created.id
+            // sync remote IDs by orderIndex
+            const createdModules = (created.modules || []).slice().sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+            if (Array.isArray(d.modules)) {
+              for (let mi = 0; mi < d.modules.length; mi++) {
+                const dm = d.modules[mi]
+                const cm = createdModules.find((x: any) => x.orderIndex === mi)
+                if (dm && cm) {
+                  dm.remoteId = cm.id
+                  const createdLessons = (cm.lessons || []).slice().sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+                  const dLessons: any[] = Array.isArray(dm.lessons) ? dm.lessons : []
+                  for (let li = 0; li < dLessons.length; li++) {
+                    const dl = dLessons[li]
+                    const cl = createdLessons.find((x: any) => x.orderIndex === li)
+                    if (dl && cl) dl.remoteId = cl.id
+                  }
+                }
+              }
+            }
+            localStorage.setItem("s7_admin_course_draft", JSON.stringify(d))
+            if (draftKey) localStorage.setItem(draftKey, JSON.stringify(d))
+          } catch {}
+        }
+      }
+    } catch (e) {
+      // ignore autosave errors silently to not annoy
+    }
+  }
+
+  const scheduleAutosave = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => { persistToServer() }, 800)
+  }
+
   useEffect(() => {
     if (!editId) return
     try {
@@ -170,7 +253,7 @@ export default function Page() {
           .catch(() => {})
       }
     } catch {}
-    finally { setHydrated(true) }
+    finally { setHydrated(true); scheduleAutosave() }
   }, [editId, draftKey])
 
   useEffect(() => {
@@ -217,7 +300,7 @@ export default function Page() {
         setPrice(0)
       }
     } catch {}
-    setHydrated(true)
+    setHydrated(true); scheduleAutosave()
   }, [isFresh, draftKey])
 
   useEffect(() => {
@@ -241,6 +324,7 @@ export default function Page() {
       if (draftKey) localStorage.setItem(draftKey, JSON.stringify(draft))
       localStorage.setItem("s7_admin_course_draft", JSON.stringify(draft))
     } catch {}
+    scheduleAutosave()
   }, [title, author, difficulty, modules, free, price, hydrated, draftKey])
 
   useEffect(() => {

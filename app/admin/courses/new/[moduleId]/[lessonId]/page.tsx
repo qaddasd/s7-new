@@ -5,7 +5,7 @@ import { Image, Upload, Trash, Bold, Italic, Heading2, List } from "lucide-react
 import dynamic from "next/dynamic"
 import { saveFile, deleteFile, getObjectUrl, getFile } from "@/lib/s7media"
 import { toast } from "@/hooks/use-toast"
-import { getTokens } from "@/lib/api"
+import { apiFetch, getTokens } from "@/lib/api"
 import FileUpload from "@/components/kokonutui/file-upload"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 const ReactMarkdown = dynamic(() => import("react-markdown").then((m) => m.default as any), { ssr: false }) as any
@@ -61,6 +61,7 @@ export default function Page() {
   const moduleId = useMemo(() => Number(params.moduleId), [params.moduleId])
   const lessonId = useMemo(() => Number(params.lessonId), [params.lessonId])
   const router = useRouter()
+  const editId = search.get("edit")
 
   const [course, setCourse] = useState<DraftCourse | null>(null)
   const [hydrated, setHydrated] = useState(false)
@@ -70,6 +71,7 @@ export default function Page() {
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [slidePreviews, setSlidePreviews] = useState<string[]>([])
   const [presPreview, setPresPreview] = useState<string | null>(null)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const draftKey = useMemo(() => {
     const d = search.get("draft")
@@ -159,6 +161,7 @@ export default function Page() {
     const next = { ...course, modules: newModules }
     setCourse(next)
     writeDraftBy(draftKey, next)
+    scheduleAutosave()
   }
 
   useEffect(() => {
@@ -206,11 +209,12 @@ export default function Page() {
     throw lastErr || new Error("Upload failed")
   }
 
-  const saveLessonDraft = (goBack?: boolean) => {
+  const saveLessonDraft = async (goBack?: boolean) => {
     if (!course) return
     try {
       writeDraftBy(draftKey, course)
       toast({ title: "Сохранено", description: "Урок сохранён в черновик" } as any)
+      await persistToServer()
       if (goBack) router.push(`/admin/courses/new/${moduleId}${qs}`)
     } catch {}
   }
@@ -290,6 +294,58 @@ export default function Page() {
     } catch (e: any) {
       toast({ title: "Ошибка", description: e?.message || "Не удалось загрузить", variant: "destructive" as any })
     }
+  }
+
+  // Build payload from current draft for server persistence
+  const buildPayload = (dc: DraftCourse) => {
+    const mods = (dc.modules || []).map((m, mi) => ({
+      ...(typeof (m as any).remoteId === 'string' && (m as any).remoteId ? { id: (m as any).remoteId } : {}),
+      title: m.title || `Модуль ${mi + 1}`,
+      orderIndex: mi,
+      lessons: (m.lessons || []).map((l, li) => ({
+        ...(typeof (l as any).remoteId === 'string' && (l as any).remoteId ? { id: (l as any).remoteId } : {}),
+        title: l.title || `Урок ${li + 1}`,
+        duration: l.time || undefined,
+        orderIndex: li,
+        isFreePreview: false,
+        content: l.content || undefined,
+        contentType: "text",
+        videoUrl: l.videoUrl || undefined,
+        presentationUrl: l.presentationUrl || undefined,
+        slides: Array.isArray(l.slideUrls) && l.slideUrls.length ? l.slideUrls.map((u: string) => ({ url: u })) : undefined,
+      }))
+    }))
+    return {
+      title: (dc.title || "Черновик").trim() || "Черновик",
+      description: (dc.title || "Черновик").trim() || "Черновик",
+      difficulty: "Легкий",
+      price: 0,
+      isFree: true,
+      isPublished: false,
+      modules: mods,
+    }
+  }
+
+  const persistToServer = async () => {
+    try {
+      const raw = readDraftBy(draftKey)
+      if (!raw) return
+      const payload = buildPayload(raw)
+      if (editId) await apiFetch(`/api/admin/courses/${encodeURIComponent(editId)}?sync=ids`, { method: 'PUT', body: JSON.stringify(payload) })
+      else {
+        const created = await apiFetch<any>(`/api/admin/courses`, { method: 'POST', body: JSON.stringify(payload) })
+        if (created?.id) {
+          const qs2 = new URLSearchParams(search.toString())
+          qs2.set('edit', created.id)
+          router.replace(`/admin/courses/new/${moduleId}/${lessonId}?${qs2.toString()}`)
+        }
+      }
+    } catch {}
+  }
+
+  const scheduleAutosave = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => { void persistToServer() }, 900)
   }
 
   return (

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { Plus, Calendar, MapPin, Users, Check, X, Clock, Building2, ArrowUpRight, Trash2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { useConfirm } from "@/components/ui/confirm"
 import { useAuth } from "@/components/auth/auth-context"
 
 type Club = {
@@ -24,6 +25,7 @@ type Club = {
 
 export default function ClubsTab() {
   const { user } = useAuth() as any
+  const confirm = useConfirm()
   const [loading, setLoading] = useState(true)
   const [clubs, setClubs] = useState<Club[]>([])
   const [name, setName] = useState("")
@@ -143,7 +145,7 @@ export default function ClubsTab() {
             <div className="flex items-center gap-3">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#00a3ff] text-black text-sm font-medium">Кол-во классов: {(c.classes||[]).length}</div>
               {String(user?.role || "").toUpperCase() === 'ADMIN' && (
-                <button onClick={async()=>{ const ok = window.confirm("Удалить кружок?"); if(!ok) return; try{ await apiFetch(`/api/clubs/${c.id}`, { method: 'DELETE' }); toast({ title: "Кружок удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">
+                <button onClick={async()=>{ const ok = await confirm({ title: 'Удалить кружок?', description: 'Действие нельзя отменить. Все классы и данные будут удалены.', confirmText: 'Удалить', cancelText: 'Отмена', variant: 'danger' }); if(!ok) return; try{ await apiFetch(`/api/clubs/${c.id}`, { method: 'DELETE' }); toast({ title: "Кружок удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">
                   <Trash2 className="w-4 h-4" /> Удалить
                 </button>
               )}
@@ -187,7 +189,7 @@ export default function ClubsTab() {
                       </div>
                       <div className="flex items-center gap-2">
                       {String(user?.role || "").toUpperCase() === 'ADMIN' && (
-                        <button onClick={async()=>{ const ok = window.confirm("Удалить класс?"); if(!ok) return; try{ await apiFetch(`/api/clubs/classes/${cl.id}`, { method: 'DELETE' }); toast({ title: "Класс удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Удалить</button>
+                        <button onClick={async()=>{ const ok = await confirm({ title: 'Удалить класс?', description: 'Действие нельзя отменить. Все занятия, расписание и отметки будут удалены.', confirmText: 'Удалить', cancelText: 'Отмена', variant: 'danger' }); if(!ok) return; try{ await apiFetch(`/api/clubs/classes/${cl.id}`, { method: 'DELETE' }); toast({ title: "Класс удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } await load() }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Удалить</button>
                       )}
                       <button onClick={()=>{
                         setExpandedClassId(isOpen ? null : cl.id)

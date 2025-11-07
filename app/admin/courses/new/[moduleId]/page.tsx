@@ -1,7 +1,8 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { LogIn, Plus } from "lucide-react"
+import { apiFetch } from "@/lib/api"
 
 interface DraftLesson {
   id: number
@@ -43,6 +44,7 @@ export default function Page() {
   const params = useParams<{ moduleId: string }>()
   const search = useSearchParams()
   const router = useRouter()
+  const editId = search.get("edit")
   const moduleId = useMemo(() => Number(params.moduleId), [params.moduleId])
   const draftKey = useMemo(() => {
     const d = search.get("draft")
@@ -59,6 +61,7 @@ export default function Page() {
   }, [search])
   const [course, setCourse] = useState<DraftCourse | null>(null)
   const [dragLessonId, setDragLessonId] = useState<number | null>(null)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const d = search.get("draft")
@@ -94,6 +97,7 @@ export default function Page() {
     setCourse(next)
     writeDraftBy(draftKey, next)
     router.push(`/admin/courses/new/${moduleId}/${nextId}${qs}`)
+    scheduleAutosave()
   }
 
   const openLesson = (lessonId: number) => {
@@ -112,6 +116,54 @@ export default function Page() {
     const next = { ...course, modules: newModules }
     setCourse(next)
     writeDraftBy(draftKey, next)
+    scheduleAutosave()
+  }
+
+  const buildPayload = (dc: DraftCourse) => {
+    const mods = (dc.modules || []).map((m, mi) => ({
+      ...(typeof (m as any).remoteId === 'string' && (m as any).remoteId ? { id: (m as any).remoteId } : {}),
+      title: m.title || `Модуль ${mi + 1}`,
+      orderIndex: mi,
+      lessons: (m.lessons || []).map((l, li) => ({
+        ...(typeof (l as any).remoteId === 'string' && (l as any).remoteId ? { id: (l as any).remoteId } : {}),
+        title: l.title || `Урок ${li + 1}`,
+        duration: l.time || undefined,
+        orderIndex: li,
+        isFreePreview: false,
+        contentType: "text",
+      }))
+    }))
+    return {
+      title: (dc.title || "Черновик").trim() || "Черновик",
+      description: (dc.title || "Черновик").trim() || "Черновик",
+      difficulty: "Легкий",
+      price: 0,
+      isFree: true,
+      isPublished: false,
+      modules: mods,
+    }
+  }
+
+  const persistToServer = async () => {
+    try {
+      const raw = readDraftBy(draftKey)
+      if (!raw) return
+      const payload = buildPayload(raw)
+      if (editId) await apiFetch(`/api/admin/courses/${encodeURIComponent(editId)}?sync=ids`, { method: 'PUT', body: JSON.stringify(payload) })
+      else {
+        const created = await apiFetch<any>(`/api/admin/courses`, { method: 'POST', body: JSON.stringify(payload) })
+        if (created?.id) {
+          const qs2 = new URLSearchParams(search.toString())
+          qs2.set('edit', created.id)
+          router.replace(`/admin/courses/new/${moduleId}?${qs2.toString()}`)
+        }
+      }
+    } catch {}
+  }
+
+  const scheduleAutosave = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => { void persistToServer() }, 800)
   }
 
   return (
