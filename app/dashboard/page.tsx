@@ -187,6 +187,23 @@ function DashboardInner() {
     }
   }
 
+  // Visible loading/redirect states to avoid a blank screen during auth init
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg)] bg-dots-pattern flex items-center justify-center">
+        <div className="text-[var(--color-text-1)] text-sm opacity-80">Загрузка…</div>
+      </div>
+    )
+  }
+
+  if (!loading && !user) {
+    return (
+      <div className="min-h-screen bg-[var(--color-bg)] bg-dots-pattern flex items-center justify-center">
+        <div className="text-[var(--color-text-1)] text-sm opacity-80">Перенаправление…</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] bg-dots-pattern flex flex-col md:flex-row relative">
       <button

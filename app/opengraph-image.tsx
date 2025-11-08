@@ -1,4 +1,4 @@
-﻿import { ImageResponse } from 'next/og'
+import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
 export const size = { width: 1200, height: 630 }
@@ -21,7 +21,15 @@ export default async function Image() {
           fontFamily: 'Inter, Geist, system-ui, Segoe UI, Arial',
         }}
       >
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.15, background: 'radial-gradient(600px 600px at 80% 20%, #00a3ff33, transparent), radial-gradient(500px 500px at 10% 90%, #00a3ff22, transparent)' }} />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: 0.15,
+            background:
+              'radial-gradient(circle at 80% 20%, rgba(0, 163, 255, 0.20) 0%, rgba(0, 0, 0, 0) 60%), radial-gradient(circle at 10% 90%, rgba(0, 163, 255, 0.13) 0%, rgba(0, 0, 0, 0) 55%)',
+          }}
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
           <div
             style={{

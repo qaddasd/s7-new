@@ -16,7 +16,8 @@ const nextConfig = {
   },
   async rewrites() {
     // Dev proxy to Express backend on :4000 so client-side apiFetch('/api/...') works locally
-    const target = process.env.API_DEV_TARGET || 'http://localhost:4000'
+    const target = process.env.API_DEV_TARGET || ''
+    if (!target) return []
     return [
       { source: '/api/:path*', destination: `${target}/api/:path*` },
       { source: '/auth/:path*', destination: `${target}/auth/:path*` },
