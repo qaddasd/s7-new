@@ -32,7 +32,7 @@ export default function ProfileTab() {
   const reloadAchievements = async () => {
     if (!user?.id) return
     try {
-      const list = await apiFetch<any[]>(`/achievements/users?userId=${user.id}`)
+      const list = await apiFetch<any[]>(`/achievements/mine`)
       setAchievements(list || [])
     } catch (e: any) {
       console.warn("Failed to load achievements:", e?.message)

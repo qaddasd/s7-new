@@ -58,7 +58,6 @@ export default function ClubsTab() {
   const [joinCode, setJoinCode] = useState("")
   const [joining, setJoining] = useState(false)
   const [subOpen, setSubOpen] = useState(false)
-  const [subscribing, setSubscribing] = useState(false)
   const [paymentComment, setPaymentComment] = useState("")
   const [submittingOpenRequest, setSubmittingOpenRequest] = useState(false)
   const [openRequestSent, setOpenRequestSent] = useState(false)
@@ -195,8 +194,6 @@ export default function ClubsTab() {
     }
   }
 
-  const handleSubscribe = async () => { setSubOpen(false) }
-
   useEffect(() => {
     if (!subOpen) return
     const base = String(user?.id || 'USER').slice(-4).toUpperCase()
@@ -205,13 +202,12 @@ export default function ClubsTab() {
     setOpenRequestSent(false)
   }, [subOpen, user?.id])
 
-  const submitOpenRequest = async () => {
-    if (!paymentComment.trim()) return
+  const submitSubscriptionRequest = async () => {
     try {
       setSubmittingOpenRequest(true)
-      await apiFetch(`/api/clubs/open-requests`, { method: 'POST', body: JSON.stringify({ comment: paymentComment }) })
+      await apiFetch(`/api/clubs/subscription-requests`, { method: 'POST', body: JSON.stringify({ amount: 2000, currency: 'KZT', period: 'month', method: 'kaspi', note: paymentComment }) })
       setOpenRequestSent(true)
-      toast({ title: 'Заявка отправлена', description: 'Мы свяжем ваш платеж и активируем доступ' } as any)
+      toast({ title: 'Заявка отправлена', description: 'Админы уведомлены. После проверки платежа доступ будет активирован.' } as any)
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить заявку', variant: 'destructive' as any })
     } finally {
@@ -448,17 +444,28 @@ export default function ClubsTab() {
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                 <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
                   <div className="text-lg font-semibold mb-3">Открыть кружок</div>
-                  <div className="text-white/90 text-sm mb-3">Переведите <b>2000 ₸</b> на Kaspi: <b>+7 776 045 7776</b>. В комментарии к переводу укажите код ниже.</div>
+                  <div className="text-white/90 text-sm mb-3">
+                    Переведите <b>2000 ₸</b> на Kaspi: <b>+7 776 045 7776</b>. 
+                    В комментарии к переводу укажите код ниже. После проверки платежа мы активируем ваш кружок.
+                  </div>
                   <div className="space-y-2">
                     <div className="text-xs text-white/60">Комментарий к переводу</div>
                     <div className="flex items-center gap-2">
-                      <input readOnly value={paymentComment} className="flex-1 bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
-                      <button onClick={()=>{ navigator.clipboard?.writeText(paymentComment) }} className="px-3 py-2 rounded-xl bg-[#2a2a35] hover:bg-[#333344] text-sm">Скопировать</button>
+                      <input readOnly value={paymentComment} className="flex-1 bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2 text-sm" />
+                      <button 
+                        onClick={()=>{ 
+                          navigator.clipboard?.writeText(paymentComment)
+                          toast({ title: 'Скопировано', description: 'Комментарий скопирован в буфер обмена' } as any)
+                        }} 
+                        className="px-3 py-2 rounded-xl bg-[#2a2a35] hover:bg-[#333344] text-sm whitespace-nowrap"
+                      >
+                        Скопировать
+                      </button>
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2 pt-4">
                     <button onClick={()=>setSubOpen(false)} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/90">Закрыть</button>
-                    <button onClick={submitOpenRequest} disabled={submittingOpenRequest || openRequestSent} className="px-4 py-2 rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black disabled:opacity-60">{openRequestSent?"Заявка отправлена":"Отправить заявку"}</button>
+                    <button onClick={submitSubscriptionRequest} disabled={submittingOpenRequest || openRequestSent} className="px-4 py-2 rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium disabled:opacity-60">{openRequestSent? 'Отправлено' : (submittingOpenRequest ? 'Отправка...' : 'Отправить заявку')}</button>
                   </div>
                 </div>
               </div>
