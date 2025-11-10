@@ -54,6 +54,7 @@ export default function CourseDetailsTab({
   const [fullCourse, setFullCourse] = useState<CourseDetails | null>(course)
   const [isGameOpen, setIsGameOpen] = useState(false)
   const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({})
+  const [dailyMissions, setDailyMissions] = useState<Array<{ id: string; title: string; target: number; xpReward: number; type?: string; progress: number; completed: boolean }>>([])
   
 
   const isFree = !course?.price || course.price === 0
@@ -123,6 +124,16 @@ export default function CourseDetailsTab({
     return () => window.removeEventListener('keydown', onKey)
   }, [isGameOpen])
 
+  // load daily missions when game opens
+  useEffect(() => {
+    let alive = true
+    if (!isGameOpen || !course?.id) return
+    apiFetch<any[]>(`/courses/${course.id}/missions`)
+      .then((data) => { if (alive) setDailyMissions(Array.isArray(data) ? data : []) })
+      .catch(() => { if (alive) setDailyMissions([]) })
+    return () => { alive = false }
+  }, [isGameOpen, course?.id])
+
   if (!course) {
     return (
       <div className="flex-1 p-8">
@@ -137,6 +148,8 @@ export default function CourseDetailsTab({
   const viewCourse = fullCourse || course
   const activeModule = viewCourse.modules.find((m) => String(m.id) === String(activeModuleId)) || viewCourse.modules[0]
   const firstIncompleteInModule = (activeModule?.lessons || []).find((l) => !completedLessons[String(l.id)])
+  const dateStr = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Aqtobe' })
+  const xpValue = Math.max(0, Math.min(100, Number((user as any)?.xp ?? (user as any)?.experiencePoints ?? 0)))
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
@@ -278,12 +291,13 @@ export default function CourseDetailsTab({
           <div className="absolute inset-0 p-6 md:p-10" onClick={(e) => e.stopPropagation()}>
             <div className="h-full w-full bg-[#0f0f14] border border-[#2a2a35] rounded-2xl text-white relative overflow-hidden">
               <button onClick={() => setIsGameOpen(false)} className="absolute top-3 right-3 rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1 text-sm">Закрыть</button>
+              <div className="absolute top-3 right-16 md:top-4 md:right-20 text-white text-xl md:text-2xl">{dateStr}</div>
               <div className="flex h-full">
                 <div className="hidden md:flex flex-col items-center justify-center w-28 p-4 border-r border-[#2a2a35]">
-                  <div className="text-xs text-white/60 mb-1 text-center">До сертификата</div>
+                  <div className="text-xs text-white/60 mb-1 text-center">До получения сертификата</div>
                   <div className="text-lg font-semibold mb-3">100xp</div>
                   <div className="h-64 w-2 rounded-full bg-[#1b1b22] overflow-hidden">
-                    <div className="w-2 bg-[#00a3ff]" style={{ height: '30%' }}></div>
+                    <div className="w-2 bg-[#00a3ff]" style={{ height: xpValue + '%' }}></div>
                   </div>
                 </div>
                 <div className="flex-1 relative">
@@ -325,6 +339,25 @@ export default function CourseDetailsTab({
                       </button>
                     </div>
                   </div>
+                </div>
+                <div className="hidden md:flex flex-col w-72 p-4 border-l border-[#2a2a35]">
+                  <div className="text-sm font-medium mb-2">Ежедневные миссии</div>
+                  {dailyMissions.map((m) => {
+                    const pct = m.target > 0 ? Math.min(100, Math.round((m.progress / m.target) * 100)) : 0
+                    return (
+                      <div key={m.id} className="bg-[#16161c] border border-[#2a2a35] rounded-xl p-4 mb-3">
+                        <div className="text-white/90 text-sm">{m.title}</div>
+                        <div className="text-white/60 text-xs mb-2">{m.progress}/{m.target}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-[#1b1b22] rounded-full overflow-hidden">
+                            <div className="h-2 bg-[#00a3ff]" style={{ width: `${pct}%` }}></div>
+                          </div>
+                          <div className="text-[#00a3ff] text-xs">+{m.xpReward}xp</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="bg-[#16161c] border border-[#2a2a35] rounded-xl p-4 h-24 opacity-60"></div>
                 </div>
               </div>
             </div>

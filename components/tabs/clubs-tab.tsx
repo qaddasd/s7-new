@@ -81,13 +81,29 @@ export default function ClubsTab() {
   const [submissionsOpen, setSubmissionsOpen] = useState<string | null>(null)
   const [submissionsBySession, setSubmissionsBySession] = useState<Record<string, Array<{ id: string; score: number; student: { id: string; fullName?: string; email: string } }>>>({})
   const [programTemplates, setProgramTemplates] = useState<Record<string, Array<{ id: string; title: string; presentationUrl?: string; scriptUrl?: string }>>>({})
+  const [lessonModal, setLessonModal] = useState<{ open: boolean; classId?: string; sessionId?: string; clubId?: string }>({ open: false })
+
+  // Close modals on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (quizOpen) setQuizOpen(null)
+      if (submissionsOpen) setSubmissionsOpen(null)
+      if (joinOpen) setJoinOpen(false)
+      if (subOpen) setSubOpen(false)
+      if (wizardOpen) setWizardOpen(false)
+    }
+    if (quizOpen || submissionsOpen || joinOpen || subOpen || wizardOpen) {
+      window.addEventListener('keydown', onKey)
+      return () => window.removeEventListener('keydown', onKey)
+    }
+  }, [quizOpen, submissionsOpen, joinOpen, subOpen, wizardOpen])
 
   const load = async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (10с)")), 10000))
-      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
+      const list = await apiFetch<Club[]>("/api/clubs/mine")
       setClubs(list)
     } catch (e: any) {
       setClubs([])
@@ -162,10 +178,14 @@ export default function ClubsTab() {
     if (!name.trim()) return
     try {
       setCreating(true)
-      await apiFetch<Club>("/api/clubs", {
-        method: "POST",
-        body: JSON.stringify({ name: name.trim(), description: desc.trim() || undefined, location: location.trim() || undefined })
-      })
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
+      await Promise.race([
+        apiFetch<Club>("/api/clubs", {
+          method: "POST",
+          body: JSON.stringify({ name: name.trim(), description: desc.trim() || undefined, location: location.trim() || undefined })
+        }),
+        timeout
+      ])
       setName("")
       setLocation("")
       setDesc("")
@@ -183,7 +203,11 @@ export default function ClubsTab() {
     if (!code) return
     try {
       setJoining(true)
-      await apiFetch(`/api/clubs/join-by-code`, { method: "POST", body: JSON.stringify({ code }) })
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
+      await Promise.race([
+        apiFetch(`/api/clubs/join-by-code`, { method: "POST", body: JSON.stringify({ code }) }),
+        timeout
+      ])
       toast({ title: "Готово", description: "Вы присоединились к кружку" } as any)
       setJoinOpen(false); setJoinCode("")
       await load()
@@ -208,6 +232,10 @@ export default function ClubsTab() {
       await apiFetch(`/api/clubs/subscription-requests`, { method: 'POST', body: JSON.stringify({ amount: 2000, currency: 'KZT', period: 'month', method: 'kaspi', note: paymentComment }) })
       setOpenRequestSent(true)
       toast({ title: 'Заявка отправлена', description: 'Админы уведомлены. После проверки платежа доступ будет активирован.' } as any)
+      // After successful request, proceed to registration wizard
+      setSubOpen(false)
+      setWizardOpen(true)
+      setWizardStep(1)
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить заявку', variant: 'destructive' as any })
     } finally {
@@ -278,8 +306,8 @@ export default function ClubsTab() {
 
       <section className="space-y-3">
         {loading && <div className="text-white/60">Загрузка...</div>}
-        {!loading && loadError && <div className="text-red-400 text-sm">Ошибка: {loadError}</div>}
-        {!loading && clubs.length === 0 && (
+        {loadError && <div className="text-red-400 text-sm">Ошибка: {loadError}</div>}
+        {clubs.length === 0 && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-[#2a2a35] bg-[#16161c] p-5 text-white">
@@ -304,8 +332,8 @@ export default function ClubsTab() {
             </div>
 
             {joinOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={()=>setJoinOpen(false)}>
+                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
                   <div className="text-lg font-semibold mb-4">Вступить по коду</div>
                   <div className="space-y-3">
                     <input value={joinCode} onChange={(e)=>setJoinCode(e.target.value)} placeholder="Код кружка" className="w-full bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
@@ -318,9 +346,86 @@ export default function ClubsTab() {
               </div>
             )}
 
+            {lessonModal.open && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={()=>setLessonModal({ open: false })}>
+                <div className="w-full max-w-3xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
+                  {(() => {
+                    const club = clubs.find(cc => cc.id === lessonModal.clubId)
+                    const cl = club?.classes?.find(kk => kk.id === lessonModal.classId)
+                    const classId = cl?.id || lessonModal.classId!
+                    const sessionId = lessonModal.sessionId!
+                    const key = `${classId}:${sessionId}`
+                    const enrolled = (cl?.enrollments || []).map(e => e.user)
+                    const tpls = programTemplates[club?.id || ""] || []
+                    const sDate = (()=>{ try{ const d = (sessions[classId]||[]).find(s=>s.id===sessionId)?.date; return d ? new Date(d).toLocaleString('ru-RU', { timeZone: 'Asia/Aqtobe' }) : '' } catch { return '' } })()
+                    return (
+                      <>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-lg font-semibold">Урок — {sDate}</div>
+                          <button onClick={()=>setLessonModal({ open: false })} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-3">
+                            <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
+                              <div className="text-sm font-medium mb-2">Материалы</div>
+                              {tpls.length === 0 && <div className="text-white/60 text-sm">Нет материалов</div>}
+                              {tpls.map(t => (
+                                <div key={t.id} className="flex items-center justify-between text-sm border border-[#2a2a35] rounded-lg px-3 py-2 mb-2">
+                                  <div>{t.title}</div>
+                                  <div className="flex items-center gap-2">
+                                    {t.presentationUrl && <a href={t.presentationUrl} target="_blank" rel="noreferrer" className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Презентация</a>}
+                                    {t.scriptUrl && <a href={t.scriptUrl} target="_blank" rel="noreferrer" className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Сценарий</a>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 flex items-center gap-2">
+                              <button onClick={()=>startQuiz(sessionId)} disabled={startingQuiz[sessionId]} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">{startingQuiz[sessionId]?"Запуск...":"Начать квиз"}</button>
+                              <button onClick={()=>openQuizModal(sessionId)} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Открыть квиз</button>
+                              <button onClick={async()=>{ await loadSubmissions(sessionId); setSubmissionsOpen(sessionId) }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Результаты</button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="text-sm font-medium">Посещаемость</div>
+                            {enrolled.length === 0 && <div className="text-white/60 text-sm">Нет учеников</div>}
+                            {enrolled.map(u => {
+                              const draft = attendanceDraft[key] || {}
+                              const st = draft[u.id]?.status || 'present'
+                              const fb = draft[u.id]?.feedback || ''
+                              return (
+                                <div key={u.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center text-sm border border-[#2a2a35] rounded-lg p-2">
+                                  <div className="col-span-2">{u.fullName || u.email}</div>
+                                  <select value={st} onChange={async (e)=>{ const val = e.target.value; setAttendanceDraft(prev=>({ ...prev, [key]: { ...draft, [u.id]: { status: val, feedback: fb } } })); try { await apiFetch(`/api/clubs/sessions/${sessionId}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: val, feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) } }} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2">
+                                    <option value="present">Пришёл</option>
+                                    <option value="absent">Не пришёл</option>
+                                    <option value="late">Опоздал</option>
+                                    <option value="excused">Уважительная</option>
+                                  </select>
+                                  <input placeholder="Фидбек (опц.)" value={fb} onChange={(e)=>setAttendanceDraft(prev=>({ ...prev, [key]: { ...draft, [u.id]: { status: st, feedback: e.target.value } } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
+                                  <div className="flex gap-2">
+                                    <button onClick={async()=>{ const prev = attendanceDraft[key] || {}; const next = { ...prev, [u.id]: { status: 'present', feedback: fb } }; setAttendanceDraft(p=>({ ...p, [key]: next })); try { await apiFetch(`/api/clubs/sessions/${sessionId}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: 'present', feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) } }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 flex items-center gap-1"><Check className="w-3 h-3"/>Пришёл</button>
+                                    <button onClick={async()=>{ const prev = attendanceDraft[key] || {}; const next = { ...prev, [u.id]: { status: 'absent', feedback: fb } }; setAttendanceDraft(p=>({ ...p, [key]: next })); try { await apiFetch(`/api/clubs/sessions/${sessionId}/attendance`, { method: 'POST', body: JSON.stringify({ marks: [{ studentId: u.id, status: 'absent', feedback: fb || undefined }] }) }); toast({ title: 'Сохранено' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось сохранить', variant: 'destructive' as any }) } }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 flex items-center gap-1"><X className="w-3 h-3"/>Нет</button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                            {enrolled.length>0 && (
+                              <div className="flex justify-end pt-1">
+                                <button onClick={async()=>{ const draft = attendanceDraft[key] || {}; const marks = Object.entries(draft).map(([studentId, v])=>({ studentId, status: (v as any).status, feedback: (v as any).feedback || undefined })); if (marks.length === 0) return; try { await apiFetch(`/api/clubs/sessions/${sessionId}/attendance`, { method: 'POST', body: JSON.stringify({ marks }) }); toast({ title: 'Отметки отправлены' }) } catch(e:any){ toast({ title: 'Ошибка', description: e?.message||'Не удалось отправить', variant: 'destructive' as any }) } }} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-4 py-2 text-black font-medium">Сохранить</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+            )}
+
             {submissionsOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={()=>setSubmissionsOpen(null)}>
+                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-lg font-semibold">Результаты квиза</div>
                     <button onClick={()=>setSubmissionsOpen(null)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
@@ -347,8 +452,8 @@ export default function ClubsTab() {
             )}
 
             {quizOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-                <div className="w-full max-w-3xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={()=>setQuizOpen(null)}>
+                <div className="w-full max-w-3xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-lg font-semibold">Квиз</div>
                     <button onClick={()=>setQuizOpen(null)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
@@ -386,8 +491,8 @@ export default function ClubsTab() {
             )}
 
             {wizardOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={()=>setWizardOpen(false)}>
+                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-lg font-semibold">Регистрация кружка</div>
                     <button onClick={()=>setWizardOpen(false)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
@@ -441,8 +546,8 @@ export default function ClubsTab() {
             )}
 
             {subOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={()=>setSubOpen(false)}>
+                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
                   <div className="text-lg font-semibold mb-3">Открыть кружок</div>
                   <div className="text-white/90 text-sm mb-3">
                     Переведите <b>2000 ₸</b> на Kaspi: <b>+7 776 045 7776</b>. 
@@ -651,76 +756,7 @@ export default function ClubsTab() {
                           </div>
                         </div>
 
-                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
-                          <div className="text-sm font-medium mb-2">Материалы</div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm items-center">
-                            <input placeholder="Название" value={(resForm[cl.id]?.title)||""} onChange={(e)=>setResForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"", url:"" }), title: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <input placeholder="URL" value={(resForm[cl.id]?.url)||""} onChange={(e)=>setResForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"", url:"" }), url: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <input placeholder="Описание (опц.)" value={(resForm[cl.id]?.description)||""} onChange={(e)=>setResForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"", url:"" }), description: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <button onClick={async()=>{ const payload=resForm[cl.id]; if(!payload?.title?.trim()||!payload?.url?.trim()) return; try { await apiFetch(`/api/clubs/classes/${cl.id}/resources`,{ method: 'POST', body: JSON.stringify({ title: payload.title.trim(), url: payload.url.trim(), description: payload.description?.trim()||undefined })}); toast({ title: "Материал добавлен" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось добавить", variant: "destructive" as any }) } setResForm(prev=>{ const n={...prev}; delete n[cl.id]; return n}); const list = await apiFetch<any[]>(`/api/clubs/classes/${cl.id}/resources`); setResources(prev=>({ ...prev, [cl.id]: list })); }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Добавить</button>
-                          </div>
-                          <div className="space-y-1">
-                            {((resources[cl.id]||[]).length===0) && <div className="text-white/60 text-sm">Нет материалов</div>}
-                            {(resources[cl.id]||[]).map(r => (
-                              <div key={r.id} className="flex items-center justify-between text-sm">
-                                <a href={r.url} target="_blank" rel="noreferrer" className="text-[#00a3ff] hover:underline">{r.title}</a>
-                                <button onClick={async()=>{ try { await apiFetch(`/api/clubs/resources/${r.id}`, { method: 'DELETE' }); toast({ title: "Материал удалён" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } const list = await apiFetch<any[]>(`/api/clubs/classes/${cl.id}/resources`); setResources(prev=>({ ...prev, [cl.id]: list })); }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Удалить</button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
-                          <div className="text-sm font-medium mb-2">Домашние задания</div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm items-center">
-                            <input placeholder="Название" value={(assignForm[cl.id]?.title)||""} onChange={(e)=>setAssignForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"" }), title: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <input type="date" value={(assignForm[cl.id]?.dueAt)||""} onChange={(e)=>setAssignForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"" }), dueAt: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <input placeholder="Описание (опц.)" value={(assignForm[cl.id]?.description)||""} onChange={(e)=>setAssignForm(prev=>({ ...prev, [cl.id]: { ...(prev[cl.id]||{ title:"" }), description: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                            <button onClick={async()=>{ const payload=assignForm[cl.id]; if(!payload?.title?.trim()) return; try { await apiFetch(`/api/clubs/classes/${cl.id}/assignments`,{ method: 'POST', body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim()||undefined, dueAt: payload.dueAt||undefined })}); toast({ title: "Задание создано" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось создать", variant: "destructive" as any }) } setAssignForm(prev=>{ const n={...prev}; delete n[cl.id]; return n}); const list = await apiFetch<any[]>(`/api/clubs/classes/${cl.id}/assignments`); setAssignments(prev=>({ ...prev, [cl.id]: list })); }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Создать</button>
-                          </div>
-                          <div className="space-y-1">
-                            {((assignments[cl.id]||[]).length===0) && <div className="text-white/60 text-sm">Нет заданий</div>}
-                            {(assignments[cl.id]||[]).map(a => (
-                              <div key={a.id} className="border border-[#2a2a35] rounded-lg p-2 space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                  <div>{a.title}{a.dueAt?` — до ${new Date(a.dueAt).toLocaleDateString()}`:""}</div>
-                                  <div className="flex gap-2">
-                                    <button onClick={async()=>{ 
-                                      try{ 
-                                        const list = await apiFetch<any[]>(`/api/clubs/assignments/${a.id}/submissions`); 
-                                        setSubs(prev=>({ ...prev, [a.id]: list })); 
-                                        toast({ title: "Ответы загружены", description: "Ответы студентов успешно загружены" } as any)
-                                      } catch(e:any){ 
-                                        toast({ title: "Ошибка", description: e?.message||"Не удалось загрузить ответы", variant: "destructive" as any }) 
-                                      } 
-                                    }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Проверить</button>
-                                    <button onClick={async()=>{ const mine = mySub[a.id]||{}; const payload={ answerText: (mine.answerText||"").trim()||undefined, attachmentUrl: (mine.attachmentUrl||"").trim()||undefined }; try{ await apiFetch(`/api/clubs/assignments/${a.id}/submissions`, { method: 'POST', body: JSON.stringify(payload) }); toast({ title: "Ответ отправлен" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось отправить", variant: "destructive" as any }) } }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Отправить ответ</button>
-                                    <button onClick={async()=>{ try{ await apiFetch(`/api/clubs/assignments/${a.id}`, { method: 'DELETE' }); toast({ title: "Задание удалено" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось удалить", variant: "destructive" as any }) } const list = await apiFetch<any[]>(`/api/clubs/classes/${cl.id}/assignments`); setAssignments(prev=>({ ...prev, [cl.id]: list })); }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Удалить</button>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                                  <textarea placeholder="Мой ответ (текст)" value={mySub[a.id]?.answerText||""} onChange={(e)=>setMySub(prev=>({ ...prev, [a.id]: { ...(prev[a.id]||{}), answerText: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2 min-h-[60px]" />
-                                  <input placeholder="Ссылка на файл (опц.)" value={mySub[a.id]?.attachmentUrl||""} onChange={(e)=>setMySub(prev=>({ ...prev, [a.id]: { ...(prev[a.id]||{}), attachmentUrl: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                                </div>
-                                {(subs[a.id]?.length>0) && (
-                                  <div className="space-y-1">
-                                    <div className="text-white/80 text-sm">Ответы учеников</div>
-                                    {subs[a.id].map(s => (
-                                      <div key={s.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center text-xs">
-                                        <div className="col-span-2">{s.student.fullName || s.student.email}</div>
-                                        <input type="number" min={0} max={100} value={gradeForm[s.id]?.grade ?? (s.grade ?? "")} onChange={(e)=>setGradeForm(prev=>({ ...prev, [s.id]: { ...(prev[s.id]||{}), grade: e.target.value? Number(e.target.value): undefined } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                                        <input placeholder="Фидбек" value={gradeForm[s.id]?.feedback ?? (s.feedback ?? "")} onChange={(e)=>setGradeForm(prev=>({ ...prev, [s.id]: { ...(prev[s.id]||{}), feedback: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                                        <button onClick={async()=>{ const gf=gradeForm[s.id]||{}; try{ await apiFetch(`/api/clubs/submissions/${s.id}/grade`, { method: 'PATCH', body: JSON.stringify({ grade: gf.grade, feedback: gf.feedback }) }); toast({ title: "Оценка сохранена" }) } catch(e:any){ toast({ title: "Ошибка", description: e?.message||"Не удалось сохранить оценку", variant: "destructive" as any }) } const list = await apiFetch<any[]>(`/api/clubs/assignments/${a.id}/submissions`); setSubs(prev=>({ ...prev, [a.id]: list })); }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Оценить</button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                          
-                          <div className="mt-3">
+                        <div className="mt-3">
                             <div className="text-sm font-medium mb-2">Участники</div>
                             {(enrolled.length===0) && <div className="text-white/60 text-sm">Пока нет</div>}
                             {enrolled.map(u=> (
@@ -812,6 +848,7 @@ export default function ClubsTab() {
                                 {isStaff && <button onClick={()=>startQuiz(today.id)} disabled={startingQuiz[today.id]} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">{startingQuiz[today.id]?"Запуск...":"Начать квиз"}</button>}
                                 <button onClick={()=>openQuizModal(today.id)} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Открыть квиз</button>
                                 {isStaff && <button onClick={async()=>{ await loadSubmissions(today.id); setSubmissionsOpen(today.id) }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Результаты</button>}
+                                {isStaff && <button onClick={()=>setLessonModal({ open: true, classId: cl.id, sessionId: today.id, clubId: c.id })} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-3 py-2 text-xs text-black">Открыть урок</button>}
                                 {!isStaff && mePresent && <button onClick={()=>openQuizModal(today.id)} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-3 py-2 text-xs text-black">Пройти квиз</button>}
                               </div>
                             </div>
@@ -848,6 +885,7 @@ export default function ClubsTab() {
                                     {(() => { const isStaff = String(user?.role||'').toUpperCase()==='ADMIN' || (c.mentors||[]).some(m=>m.user?.id===user?.id); return isStaff ? (<>
                                       <button onClick={()=>startQuiz(s.id)} disabled={startingQuiz[s.id]} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">{startingQuiz[s.id]?"Запуск...":"Начать квиз"}</button>
                                       <button onClick={async()=>{ await loadSubmissions(s.id); setSubmissionsOpen(s.id) }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Результаты</button>
+                                      <button onClick={()=>setLessonModal({ open: true, classId: cl.id, sessionId: s.id, clubId: c.id })} className="text-xs rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-3 py-1 text-black">Открыть урок</button>
                                     </> ) : null })()}
                                     <button onClick={()=>openQuizModal(s.id)} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Открыть квиз</button>
                                   </div>
