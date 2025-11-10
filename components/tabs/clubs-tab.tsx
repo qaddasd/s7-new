@@ -27,6 +27,7 @@ export default function ClubsTab() {
   const { user } = useAuth() as any
   const confirm = useConfirm()
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [clubs, setClubs] = useState<Club[]>([])
   const [name, setName] = useState("")
   const [location, setLocation] = useState("")
@@ -58,6 +59,9 @@ export default function ClubsTab() {
   const [joining, setJoining] = useState(false)
   const [subOpen, setSubOpen] = useState(false)
   const [subscribing, setSubscribing] = useState(false)
+  const [paymentComment, setPaymentComment] = useState("")
+  const [submittingOpenRequest, setSubmittingOpenRequest] = useState(false)
+  const [openRequestSent, setOpenRequestSent] = useState(false)
   const [inviteCodes, setInviteCodes] = useState<Record<string, string | null>>({})
   // Registration wizard
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -81,11 +85,14 @@ export default function ClubsTab() {
 
   const load = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
-      const list = await apiFetch<Club[]>("/api/clubs/mine")
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (10с)")), 10000))
+      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
       setClubs(list)
-    } catch {
+    } catch (e: any) {
       setClubs([])
+      setLoadError(e?.message || "Не удалось загрузить кружки")
     } finally {
       setLoading(false)
     }
@@ -191,6 +198,28 @@ export default function ClubsTab() {
   const handleSubscribe = async () => { setSubOpen(false) }
 
   useEffect(() => {
+    if (!subOpen) return
+    const base = String(user?.id || 'USER').slice(-4).toUpperCase()
+    const rnd = Math.random().toString(36).slice(2, 7).toUpperCase()
+    setPaymentComment(`S7-CLUB-${base}-${rnd}`)
+    setOpenRequestSent(false)
+  }, [subOpen, user?.id])
+
+  const submitOpenRequest = async () => {
+    if (!paymentComment.trim()) return
+    try {
+      setSubmittingOpenRequest(true)
+      await apiFetch(`/api/clubs/open-requests`, { method: 'POST', body: JSON.stringify({ comment: paymentComment }) })
+      setOpenRequestSent(true)
+      toast({ title: 'Заявка отправлена', description: 'Мы свяжем ваш платеж и активируем доступ' } as any)
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить заявку', variant: 'destructive' as any })
+    } finally {
+      setSubmittingOpenRequest(false)
+    }
+  }
+
+  useEffect(() => {
     if (!wizardOpen) return
     let alive = true
     apiFetch<any[]>(`/api/programs?active=true`).then(list => {
@@ -253,6 +282,7 @@ export default function ClubsTab() {
 
       <section className="space-y-3">
         {loading && <div className="text-white/60">Загрузка...</div>}
+        {!loading && loadError && <div className="text-red-400 text-sm">Ошибка: {loadError}</div>}
         {!loading && clubs.length === 0 && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -417,12 +447,18 @@ export default function ClubsTab() {
             {subOpen && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                 <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
-                  <div className="text-lg font-semibold mb-2">Оплата подписки</div>
-                  <div className="text-white/90 text-sm mb-4">
-                    Просто переведите <b>2000 ₸</b> на номер Kaspi: <b>+7 776 045 7776</b> <span className="whitespace-nowrap">с комментарием</span>. После перевода мы активируем доступ вручную.
+                  <div className="text-lg font-semibold mb-3">Открыть кружок</div>
+                  <div className="text-white/90 text-sm mb-3">Переведите <b>2000 ₸</b> на Kaspi: <b>+7 776 045 7776</b>. В комментарии к переводу укажите код ниже.</div>
+                  <div className="space-y-2">
+                    <div className="text-xs text-white/60">Комментарий к переводу</div>
+                    <div className="flex items-center gap-2">
+                      <input readOnly value={paymentComment} className="flex-1 bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                      <button onClick={()=>{ navigator.clipboard?.writeText(paymentComment) }} className="px-3 py-2 rounded-xl bg-[#2a2a35] hover:bg-[#333344] text-sm">Скопировать</button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button onClick={handleSubscribe} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/90">Понятно</button>
+                  <div className="flex items-center justify-end gap-2 pt-4">
+                    <button onClick={()=>setSubOpen(false)} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/90">Закрыть</button>
+                    <button onClick={submitOpenRequest} disabled={submittingOpenRequest || openRequestSent} className="px-4 py-2 rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black disabled:opacity-60">{openRequestSent?"Заявка отправлена":"Отправить заявку"}</button>
                   </div>
                 </div>
               </div>

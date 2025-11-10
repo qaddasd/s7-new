@@ -113,7 +113,15 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
   const apiUrl = typeof window !== 'undefined' && (window as any).ENV_API_URL 
     ? (window as any).ENV_API_URL 
     : (process.env.NEXT_PUBLIC_API_URL || '')
-  const fullPath = apiUrl ? `${apiUrl}${path}` : path
+  const resolvePath = (p: string) => {
+    if (apiUrl) return `${apiUrl}${p}`
+    if (p.startsWith('/api/')) return p
+    if (p.startsWith('/auth') || p.startsWith('/courses') || p.startsWith('/uploads') || p.startsWith('/media')) {
+      return `/api${p}`
+    }
+    return p
+  }
+  const fullPath = resolvePath(path)
 
   const doFetch = async (): Promise<Response> => fetch(fullPath, { ...init, headers, cache: "no-store" })
 
