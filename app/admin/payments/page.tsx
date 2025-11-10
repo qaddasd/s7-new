@@ -22,14 +22,21 @@ type ServerPurchase = {
 export default function Page() {
   const [purchases, setPurchases] = useState<ServerPurchase[]>([])
   const [loading, setLoading] = useState(true)
+  const [clubSubs, setClubSubs] = useState<Array<{ id: string; createdAt: string; amount: number; currency: string; period: string; method: string; note?: string; requester: { id: string; email: string; fullName?: string } }>>([])
+  const confirm = useConfirm()
 
   const refresh = async () => {
     setLoading(true)
     try {
-      const list = await apiFetch<ServerPurchase[]>("/api/admin/purchases")
+      const [list, subs] = await Promise.all([
+        apiFetch<ServerPurchase[]>("/api/admin/purchases"),
+        apiFetch<typeof clubSubs>("/api/admin/club-subscription-requests"),
+      ])
       setPurchases(list || [])
+      setClubSubs(subs || [])
     } catch {
       setPurchases([])
+      setClubSubs([])
     } finally {
       setLoading(false)
     }
@@ -68,8 +75,27 @@ export default function Page() {
         </button>
       </div>
 
-      <div className="space-y-3 max-w-4xl">
+      <div className="space-y-6 max-w-4xl">
         {loading && <div className="text-white/60">Загрузка...</div>}
+        {/* Club subscription requests */}
+        {!loading && clubSubs.length > 0 && (
+          <div className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4">
+            <div className="text-white font-medium mb-3">Запросы подписки кружков</div>
+            <div className="space-y-3">
+              {clubSubs.map((r) => (
+                <div key={r.id} className="flex items-center justify-between rounded-xl bg-[#0f0f14] border border-[#2a2a35] px-3 py-2 text-white">
+                  <div>
+                    <div className="font-medium">{r.requester.fullName || r.requester.email || r.requester.id}</div>
+                    <div className="text-white/70 text-sm">{Number(r.amount).toLocaleString()} {r.currency} / {r.period} • {r.method}{r.note ? ` • ${r.note}` : ''}</div>
+                    <div className="text-white/40 text-xs">{new Date(r.createdAt).toLocaleString('ru-RU')}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Course purchases */}
         {!loading && purchases.map((p) => (
           <div key={p.id} className="flex items-center justify-between rounded-2xl bg-[#16161c] border border-[#2a2a35] px-4 py-3 text-white">
             <div>

@@ -294,6 +294,47 @@ router.get("/purchases", async (req: AuthenticatedRequest, res: Response) => {
   )
 })
 
+// Club subscription requests (created as notifications for admins)
+router.get("/club-subscription-requests", async (req: AuthenticatedRequest, res: Response) => {
+  const limit = Number(req.query.limit || 50)
+  // Fetch only notifications for current admin to avoid duplicates across admins
+  const notifs = await (prisma as any).notification.findMany({
+    where: { userId: req.user!.id, type: "subscription" },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  })
+  // Collect requester IDs from metadata
+  const requesterIds = Array.from(
+    new Set(
+      (notifs || [])
+        .map((n: any) => (n?.metadata as any)?.requestUserId)
+        .filter((id: any) => typeof id === "string" && id.trim().length > 0)
+    )
+  ) as string[]
+  const users = requesterIds.length
+    ? await (prisma as any).user.findMany({
+        where: { id: { in: requesterIds } },
+        select: { id: true, email: true, fullName: true },
+      })
+    : []
+  const uMap = new Map<string, any>(users.map((u: any) => [u.id, u]))
+  const rows = (notifs || []).map((n: any) => {
+    const md: any = n?.metadata || {}
+    const reqUser = typeof md?.requestUserId === "string" ? uMap.get(md.requestUserId) : undefined
+    return {
+      id: n.id,
+      createdAt: n.createdAt,
+      amount: Number(md?.amount || 0),
+      currency: String(md?.currency || "KZT"),
+      period: String(md?.period || "month"),
+      method: String(md?.method || "kaspi"),
+      note: typeof md?.note === "string" ? md.note : undefined,
+      requester: reqUser || { id: md?.requestUserId || "", email: "", fullName: "" },
+    }
+  })
+  res.json(rows)
+})
+
 router.post("/purchases/:id/approve", async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params
   const updated = await prisma.purchase.update({

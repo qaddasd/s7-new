@@ -47,9 +47,25 @@ router.post("/subscription-requests", async (req: AuthenticatedRequest, res: Res
   const parsed = subscriptionRequestSchema.safeParse(req.body || {})
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
+  const payload = {
+    requestUserId: req.user!.id,
+    amount: data.amount,
+    currency: data.currency,
+    period: data.period,
+    method: data.method,
+    note: data.note || null,
+  }
   const admins = await (db as any).user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
   for (const a of admins) {
-    await (db as any).notification.create({ data: { userId: a.id, title: "Запрос подписки", message: `Пользователь ${req.user!.id} запросил подписку ${data.amount} ${data.currency}/мес (метод: ${data.method}).`, type: "subscription", metadata: { period: data.period } as any } })
+    await (db as any).notification.create({
+      data: {
+        userId: a.id,
+        title: "Запрос подписки кружков",
+        message: `Пользователь ${req.user!.id} запросил подписку ${data.amount} ${data.currency}/мес (метод: ${data.method}).`,
+        type: "subscription",
+        metadata: payload as any,
+      },
+    })
   }
   res.status(201).json({ ok: true })
 })

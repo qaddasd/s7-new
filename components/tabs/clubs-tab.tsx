@@ -103,13 +103,24 @@ export default function ClubsTab() {
     setLoading(true)
     setLoadError(null)
     try {
-      const list = await apiFetch<Club[]>("/api/clubs/mine")
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (12с)")), 12000))
+      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
       setClubs(list)
     } catch (e: any) {
       setClubs([])
       setLoadError(e?.message || "Не удалось загрузить кружки")
     } finally {
       setLoading(false)
+    }
+  }
+  const refreshClubsSilently = async () => {
+    try {
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (12с)")), 12000))
+      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
+      setClubs(list)
+      setLoadError(null)
+    } catch (e: any) {
+      setLoadError(e?.message || "Не удалось обновить кружки")
     }
   }
   const loadSubmissions = async (sessionId: string) => {
@@ -179,17 +190,18 @@ export default function ClubsTab() {
     try {
       setCreating(true)
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
-      await Promise.race([
+      const created = await Promise.race([
         apiFetch<Club>("/api/clubs", {
           method: "POST",
           body: JSON.stringify({ name: name.trim(), description: desc.trim() || undefined, location: location.trim() || undefined })
         }),
         timeout
-      ])
+      ]) as Club
       setName("")
       setLocation("")
       setDesc("")
-      await load()
+      setClubs((prev) => [created, ...prev])
+      refreshClubsSilently().catch(()=>{})
       toast({ title: "Кружок создан" })
     } catch (e: any) {
       toast({ title: "Ошибка", description: e?.message || "Не удалось создать", variant: "destructive" as any })
@@ -210,7 +222,7 @@ export default function ClubsTab() {
       ])
       toast({ title: "Готово", description: "Вы присоединились к кружку" } as any)
       setJoinOpen(false); setJoinCode("")
-      await load()
+      refreshClubsSilently().catch(()=>{})
     } catch (e: any) {
       toast({ title: "Ошибка", description: e?.message || "Не удалось вступить", variant: "destructive" as any })
     } finally {
@@ -1044,9 +1056,18 @@ export default function ClubsTab() {
                 <button onClick={async()=>{
                   const payload = newClass[c.id]
                   if (!payload?.title?.trim()) return
-                  await apiFetch(`/api/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) })
-                  setNewClass(prev=>{ const n={...prev}; delete n[c.id]; return n })
-                  await load()
+                  try {
+                    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
+                    await Promise.race([
+                      apiFetch(`/api/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) }),
+                      timeout
+                    ])
+                    setNewClass(prev=>{ const n={...prev}; delete n[c.id]; return n })
+                    await load()
+                    toast({ title: 'Класс создан' } as any)
+                  } catch(e:any) {
+                    toast({ title: 'Ошибка', description: e?.message || 'Не удалось создать класс', variant: 'destructive' as any })
+                  }
                 }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Создать</button>
               </div>
             </div>
