@@ -56,12 +56,14 @@ if git diff HEAD@{1} --name-only | grep -q "server/package.json"; then
     cd ..
 fi
 
-# Применяем Prisma schema и миграции (схема лежит в ./prisma/schema.prisma)
-warning "Применяем Prisma schema и миграции..."
-cd server
-npx prisma generate --schema ../prisma/schema.prisma
-npx prisma migrate deploy --schema ../prisma/schema.prisma
-cd ..
+# Проверяем изменения в prisma schema
+if git diff HEAD@{1} --name-only | grep -q "server/prisma/schema.prisma"; then
+    warning "Prisma schema изменился, применяем миграции..."
+    cd server
+    npx prisma generate
+    npx prisma migrate deploy
+    cd ..
+fi
 
 # Сборка backend
 info "Сборка backend..."
