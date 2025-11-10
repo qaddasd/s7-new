@@ -1,12 +1,10 @@
 "use client"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { ArrowLeft, BadgeInfo, LogIn, ShoppingCart, CheckCircle, ShieldAlert, Copy } from "lucide-react"
-import { useConfirm } from "@/components/ui/confirm"
+import { ArrowLeft, BadgeInfo, LogIn, ShoppingCart, CheckCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { apiFetch } from "@/lib/api"
 import { useAuth } from "@/components/auth/auth-context"
-import { social } from "@/lib/site-config"
 
 export interface CourseLesson {
   id: number
@@ -49,7 +47,6 @@ export default function CourseDetailsTab({
   onOpenLesson?: (moduleId: number | string, lessonId: number | string) => void
 }) {
   const { user } = useAuth()
-  const confirm = useConfirm()
   const [activeModuleId, setActiveModuleId] = useState<string | number>(course?.modules?.[0]?.id ?? 0)
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
@@ -116,36 +113,15 @@ export default function CourseDetailsTab({
     setShowPayment(true)
   }
 
-  const confirmPaymentSent = async () => {
-    if (!user || !course) return
-    const ok = await confirm({
-      title: 'Вы точно отправили оплату?',
-      description: 'Если вы не отправили перевод, не подтверждайте. Неправильное подтверждение замедлит обработку.',
-      confirmText: 'Отправил',
-      cancelText: 'Отмена',
-      variant: 'danger'
-    })
-    if (!ok) return
-    setIsPurchasing(true)
-    try {
-      const senderCode = (user.id || '').slice(-8)
-      await apiFetch(`/courses/${course.id}/purchase`, {
-        method: "POST",
-        body: JSON.stringify({
-          amount: course.price || 0,
-          paymentMethod: "kaspi",
-          payerFullName: user.fullName,
-          senderCode,
-        }),
-      })
-      toast({ title: "Заявка отправлена", description: "Как только оплата подтвердится, доступ будет открыт" })
-    } catch (e: any) {
-      toast({ title: "Ошибка", description: e?.message || "Не удалось отправить заявку", variant: "destructive" as any })
-    } finally {
-      setIsPurchasing(false)
-      setShowPayment(false)
-    }
-  }
+  // simplified payment flow: instruction only
+
+  // close game modal on Escape
+  useEffect(() => {
+    if (!isGameOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsGameOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isGameOpen])
 
   if (!course) {
     return (
@@ -298,8 +274,8 @@ export default function CourseDetailsTab({
 
       
       {isGameOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 bg-black/70">
-          <div className="absolute inset-0 p-6 md:p-10">
+        <div className="fixed inset-0 z-50 bg-black/70" onClick={() => setIsGameOpen(false)}>
+          <div className="absolute inset-0 p-6 md:p-10" onClick={(e) => e.stopPropagation()}>
             <div className="h-full w-full bg-[#0f0f14] border border-[#2a2a35] rounded-2xl text-white relative overflow-hidden">
               <button onClick={() => setIsGameOpen(false)} className="absolute top-3 right-3 rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1 text-sm">Закрыть</button>
               <div className="flex h-full">
@@ -360,36 +336,12 @@ export default function CourseDetailsTab({
       {showPayment && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-fade-in">
           <div className="w-full max-w-md bg-[#16161c] border border-[#2a2a35] rounded-2xl p-6 text-white animate-slide-up">
-            <div className="text-lg font-medium mb-2">Оплата через Kaspi</div>
-            <div className="text-white/80 text-sm mb-4 space-y-1">
-              <div>Сумма: <b>{course?.price?.toLocaleString()} ₸</b></div>
-              <div>Номер Kaspi: <b>{social.phone}</b></div>
-              <div className="mt-2">В комментарии укажите:</div>
-              <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-lg p-3 text-xs flex items-center justify-between">
-                <div className="space-y-1">
-                  <div>ФИО: <b>{user?.fullName ?? "Ваше ФИО"}</b></div>
-                  <div>КОД: <b>{(user?.id ?? "код").slice(-8)}</b></div>
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(`${user?.fullName ?? ''} ${(user?.id ?? '').slice(-8)}`.trim())}
-                  className="text-[#a0a0b0] hover:text-white"
-                  aria-label="Скопировать"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-              </div>
+            <div className="text-lg font-medium mb-2">Оплата курса</div>
+            <div className="text-white/90 text-sm mb-4">
+              Просто переведите <b>2000 ₸</b> на номер Kaspi: <b>+7 776 045 7776</b> <span className="whitespace-nowrap">с комментарием</span>. После перевода мы откроем доступ вручную.
             </div>
-            <div className="space-y-2 text-xs bg-[#0f0f14] border border-[#2a2a35] rounded-lg p-3">
-              <div className="flex items-center gap-2 text-[#f59e0b]">
-                <ShieldAlert className="w-4 h-4" />
-                Подтверждаем вручную. Доступ откроется в течение 2 часов после проверки.
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button onClick={() => setShowPayment(false)} className="rounded-lg bg-[#2a2a35] hover:bg-[#333344] py-2">Отмена</button>
-              <button onClick={confirmPaymentSent} disabled={isPurchasing} className="rounded-lg bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium py-2 disabled:opacity-60">
-                {isPurchasing ? 'Отправляем...' : 'Я отправил'}
-              </button>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowPayment(false)} className="rounded-full bg-[#1b1b22] border border-[#2a2a35] px-4 py-2 text-white/90">Понятно</button>
             </div>
           </div>
         </div>,

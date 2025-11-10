@@ -17,7 +17,63 @@ const clubCreateSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   location: z.string().optional(),
+  programId: z.string().optional(),
 })
+
+const joinByCodeSchema = z.object({ code: z.string().regex(/^[0-9]{4,}$/) })
+const subscriptionRequestSchema = z.object({ amount: z.number().positive().default(2000), currency: z.string().default("KZT"), period: z.string().default("month"), method: z.string().default("kaspi"), note: z.string().optional() })
+
+// Join by invite code (numeric, reusable)
+router.post("/join-by-code", async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = joinByCodeSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const code = parsed.data.code
+  const cls = await db.clubClass.findFirst({ where: { inviteCode: code }, include: { club: true } })
+  if (!cls) return res.status(404).json({ error: "Invalid code" })
+  // Enforce 30 students/class limit (non-admin)
+  const count = await db.classEnrollment.count({ where: { classId: cls.id } })
+  const isAdmin = req.user!.role === 'ADMIN'
+  if (!isAdmin && count >= 30) return res.status(400).json({ error: "Достигнут лимит: максимум 30 учеников в классе" })
+  const e = await db.classEnrollment.upsert({
+    where: { classId_userId: { classId: cls.id, userId: req.user!.id } },
+    create: { classId: cls.id, userId: req.user!.id },
+    update: { status: "active" },
+  })
+  res.status(201).json({ enrolled: true, classId: cls.id, enrollmentId: e.id })
+})
+
+// Subscription request (Kaspi manual) — notify admins only
+router.post("/subscription-requests", async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = subscriptionRequestSchema.safeParse(req.body || {})
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const data = parsed.data
+  const admins = await (db as any).user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
+  for (const a of admins) {
+    await (db as any).notification.create({ data: { userId: a.id, title: "Запрос подписки", message: `Пользователь ${req.user!.id} запросил подписку ${data.amount} ${data.currency}/мес (метод: ${data.method}).`, type: "subscription", metadata: { period: data.period } as any } })
+  }
+  res.status(201).json({ ok: true })
+})
+
+
+function generateNumericCode(len = 6): string {
+  let s = ""
+  for (let i = 0; i < len; i++) s += Math.floor(Math.random() * 10)
+  return s
+}
+
+// Parse a YYYY-MM-DD (or ISO date) as Asia/Aqtobe local midnight
+function parseAqtobeStart(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN)
+  const d = String(dateStr)
+  if (/T/.test(d)) return new Date(d)
+  return new Date(`${d}T00:00:00+05:00`)
+}
+function parseAqtobeEnd(dateStr: string): Date {
+  if (!dateStr) return new Date(NaN)
+  const d = String(dateStr)
+  if (/T/.test(d)) return new Date(d)
+  return new Date(`${d}T23:59:59+05:00`)
+}
 
 // Create single session by date (adds a new column in attendance grid)
 router.post("/classes/:classId/sessions", async (req: AuthenticatedRequest, res: Response) => {
@@ -28,7 +84,7 @@ router.post("/classes/:classId/sessions", async (req: AuthenticatedRequest, res:
   if (!ok) return res.status(403).json({ error: "Forbidden" })
   const body = z.object({ date: z.string().min(4) }).safeParse(req.body)
   if (!body.success) return res.status(400).json({ error: body.error.flatten() })
-  const d = new Date(String(body.data.date))
+  const d = parseAqtobeStart(String(body.data.date))
   if (!(d instanceof Date) || isNaN(d.getTime())) return res.status(400).json({ error: "Invalid date" })
   const s = await db.clubSession.upsert({
     where: { classId_date_scheduleItemId: { classId, date: d, scheduleItemId: null } },
@@ -48,6 +104,7 @@ router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
         OR: [
           { ownerId: userId },
           { mentors: { some: { userId } } },
+          { classes: { some: { enrollments: { some: { userId } } } } },
         ],
       }
   const clubs = await db.club.findMany({
@@ -67,9 +124,6 @@ router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
 })
 
 router.post("/", async (req: AuthenticatedRequest, res: Response) => {
-  if ((req.user as any)?.role !== "ADMIN") {
-    return res.status(403).json({ error: "Only admins can create clubs" })
-  }
   const parsed = clubCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -78,6 +132,7 @@ router.post("/", async (req: AuthenticatedRequest, res: Response) => {
       name: data.name,
       description: data.description,
       location: data.location,
+      programId: data.programId,
       ownerId: req.user!.id,
     }
   })
@@ -145,6 +200,12 @@ router.post("/:clubId/classes", async (req: AuthenticatedRequest, res: Response)
   const { clubId } = req.params
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
+  // Enforce 2 classes per club (non-admin)
+  const isAdmin = req.user!.role === 'ADMIN'
+  if (!isAdmin) {
+    const cnt = await db.clubClass.count({ where: { clubId } })
+    if (cnt >= 2) return res.status(400).json({ error: "Достигнут лимит: максимум 2 класса" })
+  }
   const parsed = classCreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
@@ -158,6 +219,29 @@ router.post("/:clubId/classes", async (req: AuthenticatedRequest, res: Response)
   })
   res.status(201).json(cls)
   log("class.create", { id: cls.id, clubId })
+})
+
+// Invite code endpoints for class join (admins/mentors/owners)
+router.get("/classes/:classId/invite-code", async (req: AuthenticatedRequest, res: Response) => {
+  const { classId } = req.params
+  const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
+  if (!cls) return res.status(404).json({ error: "Class not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  res.json({ code: cls.inviteCode || null })
+})
+
+router.post("/classes/:classId/invite-code", async (req: AuthenticatedRequest, res: Response) => {
+  const { classId } = req.params
+  const cls = await db.clubClass.findUnique({ where: { id: classId }, include: { club: true } })
+  if (!cls) return res.status(404).json({ error: "Class not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const provided = ((req.body || {}) as any).code as string | undefined
+  let code = (provided || "").trim()
+  if (!/^[0-9]{4,}$/.test(code)) code = generateNumericCode(6)
+  const updated = await db.clubClass.update({ where: { id: classId }, data: { inviteCode: code } })
+  res.json({ code: updated.inviteCode })
 })
 
 const mentorAssignSchema = z.object({ userId: z.string().min(1) })
@@ -395,6 +479,11 @@ router.post("/classes/:classId/enroll", async (req: AuthenticatedRequest, res: R
   if (!cls) return res.status(404).json({ error: "Class not found" })
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const isAdmin = req.user!.role === 'ADMIN'
+  if (!isAdmin) {
+    const cnt = await db.classEnrollment.count({ where: { classId } })
+    if (cnt >= 30) return res.status(400).json({ error: "Достигнут лимит: максимум 30 учеников в классе" })
+  }
   const parsed = enrollSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const e = await db.classEnrollment.upsert({
@@ -415,6 +504,11 @@ router.post("/classes/:classId/enroll-by-email", async (req: AuthenticatedReques
   if (!cls) return res.status(404).json({ error: "Class not found" })
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const isAdmin = req.user!.role === 'ADMIN'
+  if (!isAdmin) {
+    const cnt = await db.classEnrollment.count({ where: { classId } })
+    if (cnt >= 30) return res.status(400).json({ error: "Достигнут лимит: максимум 30 учеников в классе" })
+  }
   const parsed = enrollByEmailSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const user = await db.user.findUnique({ where: { email: parsed.data.email } })
@@ -434,6 +528,11 @@ router.post("/classes/:classId/extra-students", async (req: AuthenticatedRequest
   if (!cls) return res.status(404).json({ error: "Class not found" })
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const isAdmin = req.user!.role === 'ADMIN'
+  if (!isAdmin) {
+    const cnt = await db.classEnrollment.count({ where: { classId } })
+    if (cnt >= 30) return res.status(400).json({ error: "Достигнут лимит: максимум 30 учеников в классе" })
+  }
   const parsed = extraStudentSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const fullName = parsed.data.fullName.trim()
@@ -515,8 +614,8 @@ router.post("/classes/:classId/sessions/generate", async (req: AuthenticatedRequ
   if (!cls) return res.status(404).json({ error: "Class not found" })
   const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, cls.clubId)
   if (!ok) return res.status(403).json({ error: "Forbidden" })
-  const start = new Date(from)
-  const end = new Date(to)
+  const start = parseAqtobeStart(from)
+  const end = parseAqtobeEnd(to)
   if (!(start instanceof Date) || !(end instanceof Date) || isNaN(start.getTime()) || isNaN(end.getTime())) {
     return res.status(400).json({ error: "Invalid date range" })
   }
@@ -547,8 +646,8 @@ router.get("/classes/:classId/sessions", async (req: AuthenticatedRequest, res: 
   const { classId } = req.params
   const { from, to } = (req.query || {}) as any
   const where: any = { classId }
-  if (from) where.date = { gte: new Date(String(from)) }
-  if (to) where.date = { ...(where.date || {}), lte: new Date(String(to)) }
+  if (from) where.date = { gte: parseAqtobeStart(String(from)) }
+  if (to) where.date = { ...(where.date || {}), lte: parseAqtobeEnd(String(to)) }
   const list = await db.clubSession.findMany({ where, orderBy: { date: "asc" }, include: { attendances: true } })
   res.json(list)
 })
@@ -566,7 +665,7 @@ router.post("/sessions/:sessionId/attendance", async (req: AuthenticatedRequest,
   const parsed = attendanceSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const marks = parsed.data.marks
-
+  const admins = await (db as any).user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
   await db.$transaction(async (tx: any) => {
     for (const m of marks) {
       await (tx as any).attendance.upsert({
@@ -578,11 +677,139 @@ router.post("/sessions/:sessionId/attendance", async (req: AuthenticatedRequest,
       const notifyMsg = m.status === "present" ? "Вы посетили занятие. +100 XP" : (m.status === "absent" ? "Вы пропустили занятие." : "Вы посетили занятие.")
       await (tx as any).notification.create({ data: { userId: m.studentId, title: notifyTitle, message: notifyMsg, type: "attendance" } })
       if (m.status === "present") {
+        const u = await (tx as any).user.findUnique({ where: { id: m.studentId }, select: { experiencePoints: true, fullName: true, email: true } })
+        const before = Number(u?.experiencePoints || 0)
         await (tx as any).user.update({ where: { id: m.studentId }, data: { experiencePoints: { increment: 100 } } })
+        const crossed = before < 100 && before + 100 >= 100
+        if (crossed) {
+          for (const a of admins) {
+            await (tx as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${u?.fullName || u?.email || m.studentId}`, type: "certificate" } })
+          }
+        }
       }
     }
   })
 
   res.json({ ok: true })
   log("attendance.submit", { sessionId, count: marks.length })
+})
+
+// --- Quiz for Club Sessions ---
+const quizStartSchema = z.object({ templateId: z.string().optional() })
+const quizSubmitSchema = z.object({
+  answers: z.array(z.object({ questionIndex: z.number().int().min(0), selected: z.array(z.number().int().min(0)) }))
+})
+
+function calcQuizScore(quizJson: any, answers: Array<{ questionIndex: number; selected: number[] }>) {
+  try {
+    const qs: any[] = Array.isArray(quizJson?.questions) ? quizJson.questions : []
+    let total = 0
+    for (const a of answers) {
+      const q = qs[a.questionIndex]
+      if (!q) continue
+      const opts: any[] = Array.isArray(q.options) ? q.options : []
+      const correctIdx = opts.map((o, i) => (o?.isCorrect ? i : -1)).filter((i) => i >= 0)
+      const pts = Number(q.points || 1)
+      const sel = Array.isArray(a.selected) ? a.selected.slice().sort() : []
+      const corr = correctIdx.slice().sort()
+      const ok = sel.length === corr.length && sel.every((v, i) => v === corr[i])
+      if (ok) total += pts
+    }
+    return total
+  } catch {
+    return 0
+  }
+}
+
+async function ensurePresent(userId: string, sessionId: string) {
+  const att = await (db as any).attendance.findUnique({ where: { sessionId_studentId: { sessionId, studentId: userId } } }).catch(() => null)
+  return att && String(att.status) === "present"
+}
+
+// Start quiz for a session (admin/owner/mentor)
+router.post("/sessions/:sessionId/quiz/start", async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId } = req.params
+  const parsed = quizStartSchema.safeParse(req.body || {})
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const session = await db.clubSession.findUnique({ where: { id: sessionId }, include: { class: { include: { club: true } } } })
+  if (!session) return res.status(404).json({ error: "Session not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, session.class.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  const existing = await (db as any).clubSessionQuiz?.findUnique({ where: { sessionId } }).catch(() => null)
+  if (existing) return res.json(existing)
+  let quizJson: any = null
+  let templateId: string | undefined = parsed.data.templateId
+  if (templateId) {
+    const tpl = await (db as any).kruzhokLessonTemplate.findUnique({ where: { id: templateId } })
+    if (!tpl) return res.status(404).json({ error: "Template not found" })
+    quizJson = (tpl as any).quizJson || null
+  } else {
+    const pid = (session.class.club as any)?.programId
+    if (!pid) return res.status(400).json({ error: "No program linked to club" })
+    const tpl = await (db as any).kruzhokLessonTemplate.findFirst({ where: { programId: pid, quizJson: { not: null } }, orderBy: { orderIndex: "asc" } })
+    if (!tpl) return res.status(400).json({ error: "No quiz template in program" })
+    templateId = tpl.id
+    quizJson = (tpl as any).quizJson
+  }
+  if (!quizJson) return res.status(400).json({ error: "Template has no quiz" })
+  try {
+    const created = await (db as any).clubSessionQuiz.create({ data: { sessionId, templateId: templateId!, quizJson } })
+    return res.status(201).json(created)
+  } catch (e: any) {
+    return res.status(501).json({ error: "Quiz storage not ready. Apply DB migrations." })
+  }
+})
+
+// Get quiz for a session (enrolled or staff)
+router.get("/sessions/:sessionId/quiz", async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId } = req.params
+  const session = await db.clubSession.findUnique({ where: { id: sessionId }, include: { class: { include: { club: true } } } })
+  if (!session) return res.status(404).json({ error: "Session not found" })
+  const staff = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, session.class.clubId)
+  const enrolled = await isEnrolled(req.user!.id, session.classId)
+  if (!staff && !enrolled) return res.status(403).json({ error: "Forbidden" })
+  const q = await (db as any).clubSessionQuiz?.findUnique({ where: { sessionId } }).catch(() => null)
+  if (!q) return res.status(404).json({ error: "No quiz" })
+  res.json(q)
+})
+
+// Submit quiz answers (present students only)
+router.post("/sessions/:sessionId/quiz/submit", async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId } = req.params
+  const session = await db.clubSession.findUnique({ where: { id: sessionId } })
+  if (!session) return res.status(404).json({ error: "Session not found" })
+  const enrolled = await isEnrolled(req.user!.id, session.classId)
+  if (!enrolled) return res.status(403).json({ error: "Not enrolled" })
+  const present = await ensurePresent(req.user!.id, sessionId)
+  if (!present) return res.status(403).json({ error: "Only present students can submit" })
+  const parsed = quizSubmitSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  const q = await (db as any).clubSessionQuiz?.findUnique({ where: { sessionId } }).catch(() => null)
+  if (!q) return res.status(404).json({ error: "No quiz" })
+  const score = calcQuizScore(q.quizJson as any, parsed.data.answers)
+  try {
+    const sub = await (db as any).clubQuizSubmission.upsert({
+      where: { sessionId_studentId: { sessionId, studentId: req.user!.id } },
+      create: { sessionId, studentId: req.user!.id, answers: parsed.data.answers as any, score },
+      update: { answers: parsed.data.answers as any, score, submittedAt: new Date() },
+    })
+    return res.status(201).json({ ok: true, score, submissionId: sub.id })
+  } catch (e:any) {
+    return res.status(501).json({ error: "Quiz storage not ready. Apply DB migrations." })
+  }
+})
+
+// List submissions (staff only)
+router.get("/sessions/:sessionId/quiz/submissions", async (req: AuthenticatedRequest, res: Response) => {
+  const { sessionId } = req.params
+  const session = await db.clubSession.findUnique({ where: { id: sessionId }, include: { class: { include: { club: true } } } })
+  if (!session) return res.status(404).json({ error: "Session not found" })
+  const ok = await ensureAdminOrClubMentorOrOwner(req.user!.id, req.user!.role, session.class.clubId)
+  if (!ok) return res.status(403).json({ error: "Forbidden" })
+  try {
+    const subs = await (db as any).clubQuizSubmission.findMany({ where: { sessionId }, include: { student: { select: { id: true, fullName: true, email: true } } }, orderBy: { score: "desc" } })
+    return res.json(subs)
+  } catch (e:any) {
+    return res.status(501).json({ error: "Quiz storage not ready. Apply DB migrations." })
+  }
 })

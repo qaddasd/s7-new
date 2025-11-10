@@ -117,7 +117,15 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
     // Unified reward for correct answer
     const reward = 20
     awarded = reward
+    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints || 0
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
+    const crossed = Number(before) < 100 && Number(before) + Number(awarded) >= 100
+    if (crossed) {
+      const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
+      for (const a of admins) {
+        await (prisma as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${req.user!.id}`, type: "certificate" } })
+      }
+    }
     // increment daily missions progress for this course (type: correct_answers)
     try {
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
@@ -204,6 +212,8 @@ async function incrementDailyMissionsProgressForCourse({ courseId, userId, delta
   const missions = await (prisma as any).dailyMission.findMany({ where: { courseId, active: true, type: "correct_answers" } })
   if ((missions || []).length === 0) return
   const day = startOfDay(new Date())
+  const before = (await prisma.user.findUnique({ where: { id: userId }, select: { experiencePoints: true } }))?.experiencePoints || 0
+  let thresholdNotified = false
   for (const m of missions) {
     let p = await (prisma as any).dailyMissionProgress.findFirst({ where: { missionId: m.id, userId, day } })
     if (!p) p = await (prisma as any).dailyMissionProgress.create({ data: { missionId: m.id, userId, day, count: 0, completed: false } })
@@ -213,6 +223,16 @@ async function incrementDailyMissionsProgressForCourse({ courseId, userId, delta
     await (prisma as any).dailyMissionProgress.update({ where: { id: p.id }, data: { count: newCount, completed: willComplete, updatedAt: new Date() } })
     if (willComplete && Number(m.xpReward || 0) > 0) {
       await prisma.user.update({ where: { id: userId }, data: { experiencePoints: { increment: Number(m.xpReward || 0) } } })
+      if (!thresholdNotified) {
+        const after = Number(before) + Number(m.xpReward || 0)
+        if (Number(before) < 100 && after >= 100) {
+          const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
+          for (const a of admins) {
+            await (prisma as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${userId}`, type: "certificate" } })
+          }
+          thresholdNotified = true
+        }
+      }
     }
   }
 }

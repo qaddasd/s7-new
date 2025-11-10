@@ -401,6 +401,8 @@ model Club {
   owner       User?    @relation("ClubOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   ownerId     String?
   createdAt   DateTime @default(now())
+  programId   String?
+  program     KruzhokProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
 
   classes     ClubClass[]
   mentors     ClubMentor[]
@@ -413,6 +415,7 @@ model ClubClass {
   title       String
   description String?
   location    String?
+  inviteCode  String?  @unique
   createdAt   DateTime @default(now())
 
   enrollments   ClassEnrollment[]
@@ -471,8 +474,36 @@ model ClubSession {
 
   attendances    Attendance[]
 
+  // Quiz snapshot for the session
+  quiz           ClubSessionQuiz?
+
   @@index([classId, date])
   @@unique([classId, date, scheduleItemId])
+}
+
+model ClubSessionQuiz {
+  id         String      @id @default(cuid())
+  session    ClubSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId  String      @unique
+  templateId String?
+  quizJson   Json
+  status     String      @default("active")
+  createdAt  DateTime    @default(now())
+
+  submissions ClubQuizSubmission[]
+}
+
+model ClubQuizSubmission {
+  id          String   @id @default(cuid())
+  session     ClubSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  answers     Json
+  score       Int      @default(0)
+  submittedAt DateTime @default(now())
+
+  @@unique([sessionId, studentId])
 }
 
 model Attendance {
@@ -675,6 +706,7 @@ model KruzhokProgram {
 
   kruzhoks    Kruzhok[]
   lessons     KruzhokLessonTemplate[]
+  clubs       Club[]
 }
 
 model KruzhokLessonTemplate {
@@ -684,6 +716,9 @@ model KruzhokLessonTemplate {
   title       String
   content     String?
   orderIndex  Int
+  presentationUrl String?
+  scriptUrl   String?
+  quizJson    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

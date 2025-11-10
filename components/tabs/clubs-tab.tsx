@@ -38,7 +38,7 @@ export default function ClubsTab() {
   const [enrollEmail, setEnrollEmail] = useState<Record<string, string>>({})
   const [schedForm, setSchedForm] = useState<Record<string, { dayOfWeek: number; startTime: string; endTime: string; location?: string }>>({})
   const [genRange, setGenRange] = useState<Record<string, { from: string; to: string }>>({})
-  const [sessions, setSessions] = useState<Record<string, Array<{ id: string; date: string }>>>({})
+  const [sessions, setSessions] = useState<Record<string, Array<{ id: string; date: string; attendances?: Array<{ studentId: string; status: string; feedback?: string }> }>>>({})
   const [attendanceDraft, setAttendanceDraft] = useState<Record<string, Record<string, { status: string; feedback?: string }>>>({})
   const [loadingSessions, setLoadingSessions] = useState<Record<string, boolean>>({})
   const [resources, setResources] = useState<Record<string, Array<{ id: string; title: string; description?: string; url: string }>>>({})
@@ -53,6 +53,31 @@ export default function ClubsTab() {
   const [addDate, setAddDate] = useState<Record<string, string>>({})
   const [openClubId, setOpenClubId] = useState<string | null>(null)
   const [currentDate, setCurrentDate] = useState("")
+  const [joinOpen, setJoinOpen] = useState(false)
+  const [joinCode, setJoinCode] = useState("")
+  const [joining, setJoining] = useState(false)
+  const [subOpen, setSubOpen] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
+  const [inviteCodes, setInviteCodes] = useState<Record<string, string | null>>({})
+  // Registration wizard
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [wizardStep, setWizardStep] = useState(1)
+  const [wName, setWName] = useState("")
+  const [wLocation, setWLocation] = useState("")
+  const [wProgramId, setWProgramId] = useState("")
+  const [wPrograms, setWPrograms] = useState<Array<{ id: string; title: string }>>([])
+  const [wClass1, setWClass1] = useState<{ title: string; location?: string }>({ title: "" })
+  const [wClass2, setWClass2] = useState<{ title: string; location?: string }>({ title: "" })
+  const [wSubmitting, setWSubmitting] = useState(false)
+  // Quiz state per session
+  const [quizOpen, setQuizOpen] = useState<string | null>(null)
+  const [quizBySession, setQuizBySession] = useState<Record<string, any>>({})
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, Record<number, number[]>>>({})
+  const [startingQuiz, setStartingQuiz] = useState<Record<string, boolean>>({})
+  const [submittingQuiz, setSubmittingQuiz] = useState(false)
+  const [submissionsOpen, setSubmissionsOpen] = useState<string | null>(null)
+  const [submissionsBySession, setSubmissionsBySession] = useState<Record<string, Array<{ id: string; score: number; student: { id: string; fullName?: string; email: string } }>>>({})
+  const [programTemplates, setProgramTemplates] = useState<Record<string, Array<{ id: string; title: string; presentationUrl?: string; scriptUrl?: string }>>>({})
 
   const load = async () => {
     setLoading(true)
@@ -63,6 +88,58 @@ export default function ClubsTab() {
       setClubs([])
     } finally {
       setLoading(false)
+    }
+  const loadSubmissions = async (sessionId: string) => {
+    try {
+      const list = await apiFetch<Array<{ id: string; score: number; student: { id: string; fullName?: string; email: string } }>>(`/api/clubs/sessions/${sessionId}/quiz/submissions`)
+      setSubmissionsBySession(prev => ({ ...prev, [sessionId]: list }))
+    } catch {}
+  }
+  const loadQuiz = async (sessionId: string) => {
+    try {
+      const q = await apiFetch<any>(`/api/clubs/sessions/${sessionId}/quiz`)
+      setQuizBySession(prev => ({ ...prev, [sessionId]: q }))
+      if (!quizAnswers[sessionId]) setQuizAnswers(prev => ({ ...prev, [sessionId]: {} }))
+    } catch {
+      // no quiz yet
+    }
+  }
+  const openQuizModal = async (sessionId: string) => {
+    if (!quizBySession[sessionId]) await loadQuiz(sessionId)
+    setQuizOpen(sessionId)
+  }
+  const startQuiz = async (sessionId: string) => {
+    try {
+      setStartingQuiz(prev => ({ ...prev, [sessionId]: true }))
+      const q = await apiFetch<any>(`/api/clubs/sessions/${sessionId}/quiz/start`, { method: 'POST', body: JSON.stringify({}) })
+      setQuizBySession(prev => ({ ...prev, [sessionId]: q }))
+      setQuizOpen(sessionId)
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось начать квиз', variant: 'destructive' as any })
+    } finally {
+      setStartingQuiz(prev => ({ ...prev, [sessionId]: false }))
+    }
+  }
+  const toggleAnswer = (sessionId: string, qIdx: number, optIdx: number) => {
+    setQuizAnswers(prev => {
+      const cur = prev[sessionId] || {}
+      const selected = new Set(cur[qIdx] || [])
+      if (selected.has(optIdx)) selected.delete(optIdx); else selected.add(optIdx)
+      return { ...prev, [sessionId]: { ...cur, [qIdx]: Array.from(selected).sort() } }
+    })
+  }
+  const submitQuiz = async (sessionId: string) => {
+    const qa = quizAnswers[sessionId] || {}
+    const answers = Object.keys(qa).map(k => ({ questionIndex: Number(k), selected: qa[Number(k)] || [] }))
+    try {
+      setSubmittingQuiz(true)
+      const r = await apiFetch<any>(`/api/clubs/sessions/${sessionId}/quiz/submit`, { method: 'POST', body: JSON.stringify({ answers }) })
+      toast({ title: 'Результат', description: `Ваш счёт: ${r.score}` } as any)
+      setQuizOpen(null)
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответы', variant: 'destructive' as any })
+    } finally {
+      setSubmittingQuiz(false)
     }
   }
 
@@ -92,6 +169,56 @@ export default function ClubsTab() {
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleJoinByCode = async () => {
+    const code = (joinCode || "").trim()
+    if (!code) return
+    try {
+      setJoining(true)
+      await apiFetch(`/api/clubs/join-by-code`, { method: "POST", body: JSON.stringify({ code }) })
+      toast({ title: "Готово", description: "Вы присоединились к кружку" } as any)
+      setJoinOpen(false); setJoinCode("")
+      await load()
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Не удалось вступить", variant: "destructive" as any })
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  const handleSubscribe = async () => { setSubOpen(false) }
+
+  useEffect(() => {
+    if (!wizardOpen) return
+    let alive = true
+    apiFetch<any[]>(`/api/programs?active=true`).then(list => {
+      if (!alive) return
+      setWPrograms((list || []).map(p => ({ id: p.id, title: p.title })))
+    }).catch(()=>setWPrograms([]))
+    return () => { alive = false }
+  }, [wizardOpen])
+
+  const submitWizard = async () => {
+    const name = wName.trim()
+    if (!name) return
+    try {
+      setWSubmitting(true)
+      const club = await apiFetch<{ id: string }>(`/api/clubs`, { method: 'POST', body: JSON.stringify({ name, location: wLocation.trim() || undefined, description: undefined, programId: wProgramId || undefined }) })
+      const classPayloads: Array<{ title: string; location?: string }> = []
+      if (wClass1.title.trim()) classPayloads.push({ title: wClass1.title.trim(), location: wClass1.location?.trim() || undefined })
+      if (wClass2.title.trim()) classPayloads.push({ title: wClass2.title.trim(), location: wClass2.location?.trim() || undefined })
+      for (const cp of classPayloads) {
+        await apiFetch(`/api/clubs/${club.id}/classes`, { method: 'POST', body: JSON.stringify(cp) })
+      }
+      setWizardOpen(false); setWizardStep(1)
+      setWName(""); setWLocation(""); setWProgramId("")
+      setWClass1({ title: "" }); setWClass2({ title: "" })
+      await load()
+      toast({ title: 'Кружок создан' })
+    } catch (e: any) {
+      toast({ title: 'Ошибка', description: e?.message || 'Не удалось создать', variant: 'destructive' as any })
+    } finally { setWSubmitting(false) }
   }
 
   return (
@@ -126,7 +253,180 @@ export default function ClubsTab() {
       <section className="space-y-3">
         {loading && <div className="text-white/60">Загрузка...</div>}
         {!loading && clubs.length === 0 && (
-          <div className="text-white/60">Кружков пока нет</div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-[#2a2a35] bg-[#16161c] p-5 text-white">
+                <div className="text-xl font-semibold mb-1">Открыть кружок</div>
+                <div className="text-white/60 text-sm mb-4">Подписка: Xtg/месяц. Включает до 2 классов и 30 учеников в классе.</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <button onClick={() => setSubOpen(true)} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-3">
+                    Подключить <ArrowUpRight className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => { setWizardOpen(true); setWizardStep(1) }} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0f0f14] border border-[#2a2a35] hover:bg-[#1b1b22] text-white font-medium px-4 py-3">
+                    Регистрация
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#2a2a35] bg-[#16161c] p-5 text-white">
+                <div className="text-xl font-semibold mb-1">Вступить в кружок</div>
+                <div className="text-white/60 text-sm mb-4">Вступление по коду кружка, который вы получили от руководителя.</div>
+                <button onClick={() => setJoinOpen(true)} className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-3">
+                  Вступить <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {joinOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+                  <div className="text-lg font-semibold mb-4">Вступить по коду</div>
+                  <div className="space-y-3">
+                    <input value={joinCode} onChange={(e)=>setJoinCode(e.target.value)} placeholder="Код кружка" className="w-full bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button onClick={()=>setJoinOpen(false)} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/80">Отмена</button>
+                      <button onClick={handleJoinByCode} disabled={joining || !joinCode.trim()} className="px-4 py-2 rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black disabled:opacity-60">{joining?"Проверяю...":"Вступить"}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {submissionsOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-lg font-semibold">Результаты квиза</div>
+                    <button onClick={()=>setSubmissionsOpen(null)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
+                  </div>
+                  {(() => {
+                    const list = submissionsBySession[submissionsOpen] || []
+                    return (
+                      <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                        {list.length === 0 && <div className="text-white/60">Нет отправок</div>}
+                        {list.map((s, idx) => (
+                          <div key={s.id} className="flex items-center justify-between border border-[#2a2a35] rounded-xl px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-[#0f0f14] border border-[#2a2a35] inline-flex items-center justify-center">{idx+1}</div>
+                              <div>{s.student.fullName || s.student.email}</div>
+                            </div>
+                            <div className="text-white/80">{s.score} баллов</div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {quizOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="w-full max-w-3xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-lg font-semibold">Квиз</div>
+                    <button onClick={()=>setQuizOpen(null)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
+                  </div>
+                  {(() => {
+                    const q = quizBySession[quizOpen] || {}
+                    const questions: any[] = Array.isArray(q?.quizJson?.questions) ? q.quizJson.questions : []
+                    return (
+                      <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                        {questions.length === 0 && <div className="text-white/60">Квиз не найден</div>}
+                        {questions.map((qq, qi) => (
+                          <div key={qi} className="border border-[#2a2a35] rounded-xl p-3">
+                            <div className="font-medium mb-2">{qq.title || `Вопрос ${qi+1}`}</div>
+                            <div className="space-y-2">
+                              {(qq.options||[]).map((op: any, oi: number) => {
+                                const selected = (quizAnswers[quizOpen!]?.[qi] || []).includes(oi)
+                                return (
+                                  <label key={oi} className="flex items-center gap-2 text-sm">
+                                    <input type="checkbox" checked={selected} onChange={()=>toggleAnswer(quizOpen!, qi, oi)} />
+                                    <span>{op.text || String(op)}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                  <div className="mt-4 flex items-center justify-end">
+                    <button onClick={()=>submitQuiz(quizOpen!)} disabled={submittingQuiz} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black px-4 py-2 disabled:opacity-60">Отправить</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {wizardOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-2xl rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-lg font-semibold">Регистрация кружка</div>
+                    <button onClick={()=>setWizardOpen(false)} className="px-3 py-1 rounded-full bg-[#2a2a35] hover:bg-[#333344] text-sm">Закрыть</button>
+                  </div>
+                  <div className="mb-4 flex items-center gap-2 text-xs text-white/60">
+                    <div className={`px-2 py-1 rounded-full ${wizardStep===1?'bg-[#00a3ff] text-black':'bg-[#0f0f14] border border-[#2a2a35]'}`}>Шаг 1</div>
+                    <div className={`px-2 py-1 rounded-full ${wizardStep===2?'bg-[#00a3ff] text-black':'bg-[#0f0f14] border border-[#2a2a35]'}`}>Шаг 2</div>
+                  </div>
+                  {wizardStep === 1 && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input value={wName} onChange={(e)=>setWName(e.target.value)} placeholder="Название кружка" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                        <input value={wLocation} onChange={(e)=>setWLocation(e.target.value)} placeholder="Локация (опц.)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                      </div>
+                      <div>
+                        <div className="text-sm mb-1">Программа</div>
+                        <select value={wProgramId} onChange={(e)=>setWProgramId(e.target.value)} className="w-full bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2">
+                          <option value="">— Выберите программу (опц.) —</option>
+                          {wPrograms.map(p => (
+                            <option key={p.id} value={p.id}>{p.title}</option>
+                          ))}
+                        </select>
+                        <div className="text-xs text-white/50 mt-1">Программы управляются в админке.</div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button onClick={()=>setWizardStep(2)} disabled={!wName.trim()} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black px-4 py-2 disabled:opacity-60">Далее</button>
+                      </div>
+                    </div>
+                  )}
+                  {wizardStep === 2 && (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium">Классы (до 2 шт.)</div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <input value={wClass1.title} onChange={(e)=>setWClass1(prev=>({ ...prev, title: e.target.value }))} placeholder="Класс 1 — название" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                          <input value={wClass1.location||""} onChange={(e)=>setWClass1(prev=>({ ...prev, location: e.target.value }))} placeholder="Локация (опц.)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                        </div>
+                        <div className="space-y-2">
+                          <input value={wClass2.title} onChange={(e)=>setWClass2(prev=>({ ...prev, title: e.target.value }))} placeholder="Класс 2 — название (опц.)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                          <input value={wClass2.location||""} onChange={(e)=>setWClass2(prev=>({ ...prev, location: e.target.value }))} placeholder="Локация (опц.)" className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl px-3 py-2" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <button onClick={()=>setWizardStep(1)} className="rounded-full bg-[#0f0f14] border border-[#2a2a35] px-4 py-2">Назад</button>
+                        <button onClick={submitWizard} disabled={wSubmitting || !wName.trim()} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black px-4 py-2 disabled:opacity-60">Создать</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {subOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white">
+                  <div className="text-lg font-semibold mb-2">Оплата подписки</div>
+                  <div className="text-white/90 text-sm mb-4">
+                    Просто переведите <b>2000 ₸</b> на номер Kaspi: <b>+7 776 045 7776</b> <span className="whitespace-nowrap">с комментарием</span>. После перевода мы активируем доступ вручную.
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <button onClick={handleSubscribe} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/90">Понятно</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
         {!loading && clubs.map((c) => (
           <div key={c.id} className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-5 text-white space-y-4">
@@ -137,6 +437,9 @@ export default function ClubsTab() {
               <div className="flex-1">
                 <div className="text-xl font-semibold">{c.name}</div>
                 {c.location && <div className="text-white/70 text-sm inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{c.location}</div>}
+              </div>
+              <div className="hidden md:block text-xs text-white/70">
+                <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#0f0f14] border border-[#2a2a35]">Подписка: до 2 классов, 30 учеников/класс</div>
               </div>
               <button onClick={() => setOpenClubId(openClubId === c.id ? null : c.id)} className="w-9 h-9 rounded-lg bg-[#0f0f14] border border-[#2a2a35] inline-flex items-center justify-center">
                 <ArrowUpRight className="w-5 h-5" />
@@ -226,12 +529,34 @@ export default function ClubsTab() {
                               setAssignments((prev)=>({ ...prev, [cl.id]: asgList }))
                             } catch {}
                           })()
+                          void (async ()=>{
+                            try {
+                              const pid = (c as any)?.programId
+                              if (pid) {
+                                const tpls = await apiFetch<any[]>(`/api/programs/${pid}/templates`)
+                                setProgramTemplates(prev => ({ ...prev, [c.id]: (tpls||[]).map(t=>({ id: t.id, title: t.title, presentationUrl: t.presentationUrl, scriptUrl: t.scriptUrl })) }))
+                              }
+                            } catch {}
+                          })()
+                          void (async ()=>{
+                            try {
+                              const data = await apiFetch<{ code: string | null }>(`/api/clubs/classes/${cl.id}/invite-code`)
+                              setInviteCodes((prev)=>({ ...prev, [cl.id]: data?.code ?? null }))
+                            } catch { setInviteCodes((prev)=>({ ...prev, [cl.id]: null })) }
+                          })()
                         }
                       }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">{isOpen?"Скрыть":"Управление"}</button>
                       </div>
                     </div>
                     {isOpen && (
                       <div className="space-y-4">
+                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
+                          <div className="text-sm font-medium mb-2">Код вступления</div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <div className="px-2 py-1 rounded bg-[#1b1b22] border border-[#2a2a35]">{inviteCodes[cl.id] || 'не сгенерирован'}</div>
+                            <button onClick={async()=>{ try{ const r = await apiFetch<{code:string}>(`/api/clubs/classes/${cl.id}/invite-code`, { method: 'POST' }); setInviteCodes(p=>({ ...p, [cl.id]: r.code })); toast({ title: 'Код обновлён' }) } catch(e:any){ toast({ title:'Ошибка', description: e?.message||'Не удалось сгенерировать', variant:'destructive' as any }) } }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Сгенерировать</button>
+                          </div>
+                        </div>
                         
                         <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
                           <div className="text-sm font-medium mb-2">Добавить ученика по email</div>
@@ -427,6 +752,42 @@ export default function ClubsTab() {
                         </div>
 
                         
+                        {/* Сегодняшний урок */}
+                        {(() => {
+                          const todayStr = new Date().toLocaleDateString('ru-RU', { timeZone: 'Asia/Aqtobe' })
+                          const today = classSessions.find(ss => new Date(ss.date).toLocaleDateString('ru-RU', { timeZone: 'Asia/Aqtobe' }) === todayStr)
+                          if (!today) return null
+                          const isStaff = String(user?.role||'').toUpperCase()==='ADMIN' || (c.mentors||[]).some(m=>m.user?.id===user?.id)
+                          const att = (sessions[cl.id]||[]).find(s=>s.id===today.id)?.attendances || []
+                          const mePresent = Boolean(att.find((a:any)=>a?.studentId===user?.id && String(a?.status)==='present'))
+                          return (
+                            <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 mb-2">
+                              <div className="text-sm font-medium mb-1">Сегодняшний урок</div>
+                              <div className="text-white/80 text-sm mb-2">{new Date(today.date).toLocaleString('ru-RU', { timeZone: 'Asia/Aqtobe' })}</div>
+                              <div className="flex items-center gap-2">
+                                {isStaff && <button onClick={()=>startQuiz(today.id)} disabled={startingQuiz[today.id]} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">{startingQuiz[today.id]?"Запуск...":"Начать квиз"}</button>}
+                                <button onClick={()=>openQuizModal(today.id)} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Открыть квиз</button>
+                                {isStaff && <button onClick={async()=>{ await loadSubmissions(today.id); setSubmissionsOpen(today.id) }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2 text-xs">Результаты</button>}
+                                {!isStaff && mePresent && <button onClick={()=>openQuizModal(today.id)} className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] px-3 py-2 text-xs text-black">Пройти квиз</button>}
+                              </div>
+                            </div>
+                          )
+                        })()}
+
+                        <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
+                          <div className="text-sm font-medium">Материалы программы</div>
+                          {((programTemplates[c.id]||[]).length===0) && <div className="text-white/60 text-sm">Нет материалов</div>}
+                          {(programTemplates[c.id]||[]).map(t => (
+                            <div key={t.id} className="flex items-center justify-between text-sm border border-[#2a2a35] rounded-lg px-3 py-2">
+                              <div>{t.title}</div>
+                              <div className="flex items-center gap-2">
+                                {t.presentationUrl && <a href={t.presentationUrl} target="_blank" rel="noreferrer" className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Презентация</a>}
+                                {t.scriptUrl && <a href={t.scriptUrl} target="_blank" rel="noreferrer" className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Сценарий</a>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
                         <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
                           <div className="text-sm font-medium">Ближайшие занятия</div>
                           {loadingSessions[cl.id] && <div className="text-white/60 text-sm">Загрузка...</div>}
@@ -437,7 +798,16 @@ export default function ClubsTab() {
                             const draft = attendanceDraft[key] || {}
                             return (
                               <div key={s.id} className="border border-[#2a2a35] rounded-lg p-3">
-                                <div className="text-white/80 text-sm mb-2">{d.toLocaleString()}</div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-white/80 text-sm">{d.toLocaleString('ru-RU', { timeZone: 'Asia/Aqtobe' })}</div>
+                                  <div className="flex items-center gap-2">
+                                    {(() => { const isStaff = String(user?.role||'').toUpperCase()==='ADMIN' || (c.mentors||[]).some(m=>m.user?.id===user?.id); return isStaff ? (<>
+                                      <button onClick={()=>startQuiz(s.id)} disabled={startingQuiz[s.id]} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">{startingQuiz[s.id]?"Запуск...":"Начать квиз"}</button>
+                                      <button onClick={async()=>{ await loadSubmissions(s.id); setSubmissionsOpen(s.id) }} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Результаты</button>
+                                    </> ) : null })()}
+                                    <button onClick={()=>openQuizModal(s.id)} className="text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1">Открыть квиз</button>
+                                  </div>
+                                </div>
                                 <div className="space-y-2">
                                   {enrolled.length === 0 && <div className="text-white/60 text-sm">Нет учеников</div>}
                                   {enrolled.map((u) => {
@@ -503,7 +873,7 @@ export default function ClubsTab() {
                                     <tr>
                                       <th className="sticky left-0 bg-[#0f0f14] px-3 py-2 text-left border-b border-[#2a2a35]">ФИО</th>
                                       {colDates.map(d => (
-                                        <th key={d} className="px-3 py-2 text-center border-b border-[#2a2a35] whitespace-nowrap">{new Date(d).toLocaleDateString("ru-RU")}</th>
+                                        <th key={d} className="px-3 py-2 text-center border-b border-[#2a2a35] whitespace-nowrap">{new Date(d).toLocaleDateString("ru-RU", { timeZone: 'Asia/Aqtobe' })}</th>
                                       ))}
                                     </tr>
                                   </thead>

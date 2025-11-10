@@ -1,4 +1,4 @@
-﻿import express from "express"
+import express from "express"
 import cors from "cors"
 import helmet from "helmet"
 import rateLimit from "express-rate-limit"
@@ -17,6 +17,7 @@ import { router as teamsRouter } from "./routes/teams"
 import { router as uploadRouter } from "./routes/uploads"
 import { router as clubsRouter } from "./routes/clubs"
 import { router as newsRouter } from "./routes/news"
+import { router as programsRouter } from "./routes/programs"
 import { router as kruzhokRouter } from "./routes/kruzhok"
 import { router as kruzhokLessonsRouter } from "./routes/kruzhok-lessons"
 import { router as kruzhokMatchingRouter } from "./routes/kruzhok-matching"
@@ -86,6 +87,7 @@ app.use("/clubs", clubsRouter)
 app.use("/api/clubs", clubsRouter)
 app.use("/news", newsRouter)
 app.use("/api/news", newsRouter)
+app.use("/api/programs", programsRouter)
 app.use("/api/kruzhok", kruzhokRouter)
 app.use("/api/kruzhok-lessons", kruzhokLessonsRouter)
 app.use("/api/kruzhok-matching", kruzhokMatchingRouter)
