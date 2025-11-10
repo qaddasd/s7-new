@@ -9,6 +9,22 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
+    ]
+  },
   async rewrites() {
     // Dev proxy to Express backend on :4000 so client-side apiFetch('/api/...') works locally
     const target = process.env.API_DEV_TARGET || ''
