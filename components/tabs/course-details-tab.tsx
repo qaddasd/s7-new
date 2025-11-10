@@ -291,7 +291,7 @@ export default function CourseDetailsTab({
           <div className="absolute inset-0 p-6 md:p-10" onClick={(e) => e.stopPropagation()}>
             <div className="h-full w-full bg-[#0f0f14] border border-[#2a2a35] rounded-2xl text-white relative overflow-hidden">
               <button onClick={() => setIsGameOpen(false)} className="absolute top-3 right-3 rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1 text-sm">Закрыть</button>
-              <div className="absolute top-3 right-28 md:top-4 md:right-40 z-20 pointer-events-none text-white text-xl md:text-2xl whitespace-nowrap">{dateStr}</div>
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none text-white/80 text-base md:text-lg whitespace-nowrap">{dateStr}</div>
               <div className="flex h-full">
                 <div className="hidden md:flex flex-col items-center justify-center w-28 p-4 border-r border-[#2a2a35]">
                   <div className="text-xs text-white/60 mb-1 text-center">До получения сертификата</div>

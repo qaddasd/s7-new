@@ -50,13 +50,13 @@ export default function ProfileDropdown({
                             type="button"
                             className="flex items-center gap-4 p-3 rounded-2xl bg-[var(--color-surface-2)] border border-[var(--color-border-1)] hover:bg-[var(--color-surface-3)] transition-all duration-[var(--dur-fast)] focus:outline-none text-[var(--color-text-1)]"
                         >
-                            <div className="text-left flex-1">
-                                <div className="text-sm font-medium tracking-tight leading-tight">
+                            <div className="text-left flex-1 min-w-0">
+                                <div className="text-sm font-medium tracking-tight leading-tight truncate">
                                     {data.name}
                                 </div>
-                                <div className="text-xs text-[var(--color-text-3)] tracking-tight leading-tight">{data.email}</div>
+                                <div className="text-xs text-[var(--color-text-3)] tracking-tight leading-tight truncate">{data.email}</div>
                                 {typeof data.xp === 'number' && (
-                                  <div className="mt-1 text-[11px] text-[#00a3ff]">XP: {data.xp}</div>
+                                  <div className="mt-1.5 text-xs font-semibold text-[#00a3ff]">XP: {data.xp}</div>
                                 )}
                             </div>
                             <div className="relative">

@@ -103,8 +103,7 @@ export default function ClubsTab() {
     setLoading(true)
     setLoadError(null)
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (12с)")), 12000))
-      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
+      const list = await apiFetch<Club[]>("/api/clubs/mine")
       setClubs(list)
     } catch (e: any) {
       setClubs([])
@@ -115,8 +114,7 @@ export default function ClubsTab() {
   }
   const refreshClubsSilently = async () => {
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут загрузки (12с)")), 12000))
-      const list = (await Promise.race([apiFetch<Club[]>("/api/clubs/mine"), timeout])) as Club[]
+      const list = await apiFetch<Club[]>("/api/clubs/mine")
       setClubs(list)
       setLoadError(null)
     } catch (e: any) {
