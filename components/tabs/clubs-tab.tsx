@@ -90,7 +90,6 @@ export default function ClubsTab() {
       setLoading(false)
     }
   }
-
   const loadSubmissions = async (sessionId: string) => {
     try {
       const list = await apiFetch<Array<{ id: string; score: number; student: { id: string; fullName?: string; email: string } }>>(`/api/clubs/sessions/${sessionId}/quiz/submissions`)
