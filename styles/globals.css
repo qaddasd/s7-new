@@ -225,7 +225,7 @@
   .toast-motion[data-state="closed"] { animation: toast-exit .32s var(--easing) both; }
   
   .animate-fade-in { animation: fade-in .6s ease-out; }
-  .animate-fade-in-up { animation: fade-in-up .5s ease-out forwards; opacity: 0; }
+  .animate-fade-in-up { animation: fade-in-up .5s ease-out forwards; }
   .animate-slide-in-left { animation: slide-in-left .5s ease-out; }
 
   /* Restored app-wide animation utilities */
@@ -246,9 +246,9 @@
     to   { opacity: 0; transform: translateX(-100%); }
   }
 
-  .animate-slide-up { animation: slide-up .6s ease-out forwards; opacity: 0; }
-  .animate-slide-in-bottom { animation: slide-in-bottom .8s ease-out forwards; opacity: 0; }
-  .animate-fade-in-scale { animation: fade-in-scale .5s ease-out forwards; opacity: 0; }
+  .animate-slide-up { animation: slide-up .6s ease-out forwards; }
+  .animate-slide-in-bottom { animation: slide-in-bottom .8s ease-out forwards; }
+  .animate-fade-in-scale { animation: fade-in-scale .5s ease-out forwards; }
   .animate-slide-out-left { animation: slide-out-left .3s ease-in forwards; }
   .animate-fade-out { animation: fade-in .2s ease-in reverse forwards; }
   .animate-pulse-slow { animation: pulse 2s ease-in-out infinite; }
