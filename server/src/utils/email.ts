@@ -117,44 +117,6 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   await transporter.sendMail(mailOptions)
 }
 
-export async function sendCertificateEmail(email: string, pngBuffer: Buffer): Promise<void> {
-  const mailOptions = {
-    from: 'no-reply@s7robotics.space',
-    to: email,
-    subject: 'Сертификат S7 Robotics',
-    html: `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Сертификат</title>
-  <style>
-    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif; background-color:#0a0a0a; color:#ffffff; margin:0; padding:0; }
-    .container { max-width:600px; margin:0 auto; padding:20px; background-color:#0b0b0b; border:1px dashed #1f1f1f; border-radius:20px; }
-    .header { text-align:center; padding:20px 0; }
-    .logo { max-width:120px; height:auto; margin:0 auto; display:block; }
-    .content { padding: 12px 0; }
-  </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
-        <h1>Поздравляем!</h1>
-      </div>
-      <div class="content">
-        <p>Вы достигли 100 баллов XP. Во вложении — ваш сертификат.</p>
-      </div>
-    </div>
-  </body>
-</html>`,
-    attachments: [
-      { filename: 'certificate.png', content: pngBuffer, contentType: 'image/png' }
-    ]
-  }
-  await transporter.sendMail(mailOptions)
-}
-
 // Send password reset email
 export async function sendPasswordResetEmail(email: string, code: string): Promise<void> {
   const mailOptions = {

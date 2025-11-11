@@ -17,8 +17,7 @@ import { prisma } from "../db"
 import { optionalAuth, requireAuth } from "../middleware/auth"
 import { requireAdmin } from "../middleware/auth"
 import type { AuthenticatedRequest } from "../types"
-import { generateCertificate } from "../utils/certificate"
-import { sendCertificateEmail } from "../utils/email"
+import { sendCertificate } from "../utils/certificate"
 
 export const router = Router()
 
@@ -102,15 +101,7 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (level) where.level = Number(level)
   if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
-  let answeredMap = new Map<string, any>()
-  if (req.user?.id) {
-    const ids = (list || []).map((q: any) => String(q.id))
-    if (ids.length) {
-      const ans = await (prisma as any).courseAnswer.findMany({ where: { questionId: { in: ids }, userId: req.user!.id } })
-      answeredMap = new Map<string, any>((ans || []).map((a: any) => [String(a.questionId), a]))
-    }
-  }
-  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level, answered: Boolean(answeredMap.get(String(q.id))) })))
+  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level })))
 })
 
 router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -118,24 +109,51 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   const { selectedIndex } = z.object({ selectedIndex: z.number().int().min(0) }).parse(req.body)
   const q = await (prisma as any).courseQuestion.findUnique({ where: { id: questionId } })
   if (!q) return res.status(404).json({ error: "Question not found" })
-  const existing = await (prisma as any).courseAnswer.findFirst({ where: { questionId, userId: req.user!.id } })
-  if (existing) return res.status(409).json({ alreadyAnswered: true, isCorrect: Boolean(existing.isCorrect), correctIndex: q.correctIndex, xpAwarded: 0 })
+  
+  // Проверка на уже правильно отвеченный вопрос
+  const existingCorrectAnswer = await (prisma as any).courseAnswer.findFirst({
+    where: { questionId, userId: req.user!.id, isCorrect: true }
+  })
+  if (existingCorrectAnswer) {
+    return res.status(200).json({ 
+      isCorrect: false, 
+      answerId: existingCorrectAnswer.id, 
+      correctIndex: q.correctIndex, 
+      xpAwarded: 0,
+      message: "Вы уже правильно ответили на этот вопрос" 
+    })
+  }
+  
   const isCorrect = Number(selectedIndex) === Number(q.correctIndex)
-  const ans = await (prisma as any).courseAnswer.create({ data: { questionId, userId: req.user!.id, selectedIndex, isCorrect } })
+  const ans = await (prisma as any).courseAnswer.create({
+    data: { questionId, userId: req.user!.id, selectedIndex, isCorrect },
+  })
   let awarded = 0
   if (isCorrect) {
-    const reward = Number(q.xpReward || 20)
+    // Используем xpReward из вопроса
+    const reward = Number(q.xpReward) || 20
     awarded = reward
-    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true, email: true, fullName: true } }))
-    const beforeXp = Number(before?.experiencePoints || 0)
+    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true, email: true, fullName: true } }))?.experiencePoints || 0
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
-    const crossed = beforeXp < 100 && beforeXp + awarded >= 100
-    if (crossed && before?.email) {
+    const afterXP = Number(before) + Number(awarded)
+    const crossed = Number(before) < 100 && afterXP >= 100
+    if (crossed) {
+      // Отправка сертификата
       try {
-        const png = await generateCertificate(before.fullName || before.email)
-        await sendCertificateEmail(before.email, png)
-      } catch {}
+        const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true, fullName: true } })
+        if (user) {
+          await sendCertificate(user.email, user.fullName)
+        }
+      } catch (err) {
+        console.error("Failed to send certificate:", err)
+      }
+      // Уведомление админам
+      const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
+      for (const a of admins) {
+        await (prisma as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${req.user!.id}`, type: "certificate" } })
+      }
     }
+    // increment daily missions progress for this course (type: correct_answers)
     try {
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
     } catch {}

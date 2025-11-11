@@ -613,8 +613,6 @@ model CourseAnswer {
   selectedIndex Int
   isCorrect    Boolean
   createdAt    DateTime @default(now())
-
-  @@unique([questionId, userId])
 }
 
 // Daily Missions per course with per-user daily progress
