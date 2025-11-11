@@ -17,6 +17,8 @@ import { prisma } from "../db"
 import { optionalAuth, requireAuth } from "../middleware/auth"
 import { requireAdmin } from "../middleware/auth"
 import type { AuthenticatedRequest } from "../types"
+import { generateCertificate } from "../utils/certificate"
+import { sendCertificateEmail } from "../utils/email"
 
 export const router = Router()
 
@@ -100,7 +102,15 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (level) where.level = Number(level)
   if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
-  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level })))
+  let answeredMap = new Map<string, any>()
+  if (req.user?.id) {
+    const ids = (list || []).map((q: any) => String(q.id))
+    if (ids.length) {
+      const ans = await (prisma as any).courseAnswer.findMany({ where: { questionId: { in: ids }, userId: req.user!.id } })
+      answeredMap = new Map<string, any>((ans || []).map((a: any) => [String(a.questionId), a]))
+    }
+  }
+  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level, answered: Boolean(answeredMap.get(String(q.id))) })))
 })
 
 router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -108,30 +118,30 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   const { selectedIndex } = z.object({ selectedIndex: z.number().int().min(0) }).parse(req.body)
   const q = await (prisma as any).courseQuestion.findUnique({ where: { id: questionId } })
   if (!q) return res.status(404).json({ error: "Question not found" })
+  const existing = await (prisma as any).courseAnswer.findFirst({ where: { questionId, userId: req.user!.id } })
+  if (existing) return res.status(409).json({ alreadyAnswered: true, isCorrect: Boolean(existing.isCorrect), correctIndex: q.correctIndex, xpAwarded: 0 })
   const isCorrect = Number(selectedIndex) === Number(q.correctIndex)
-  const ans = await (prisma as any).courseAnswer.create({
-    data: { questionId, userId: req.user!.id, selectedIndex, isCorrect },
-  })
+  const ans = await (prisma as any).courseAnswer.create({ data: { questionId, userId: req.user!.id, selectedIndex, isCorrect } })
   let awarded = 0
+  let crossed = false
   if (isCorrect) {
-    // Unified reward for correct answer
-    const reward = 20
+    const reward = Number(q.xpReward || 20)
     awarded = reward
-    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints || 0
+    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true, email: true, fullName: true } }))
+    const beforeXp = Number(before?.experiencePoints || 0)
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
-    const crossed = Number(before) < 100 && Number(before) + Number(awarded) >= 100
-    if (crossed) {
-      const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
-      for (const a of admins) {
-        await (prisma as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${req.user!.id}`, type: "certificate" } })
-      }
+    crossed = beforeXp < 100 && beforeXp + awarded >= 100
+    if (crossed && before?.email) {
+      try {
+        const png = await generateCertificate(before.fullName || before.email)
+        await sendCertificateEmail(before.email, png, before.fullName || undefined)
+      } catch {}
     }
-    // increment daily missions progress for this course (type: correct_answers)
     try {
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
     } catch {}
   }
-  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded })
+  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded, xpCrossed100: crossed })
 })
 
 // Daily missions
@@ -403,10 +413,16 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
         duration: lesson.duration,
         orderIndex: lesson.orderIndex,
         isFreePreview: lesson.isFreePreview,
-        videoUrl: toApiMedia(lesson.videoUrl),
-        presentationUrl: toApiMedia(lesson.presentationUrl),
+        videoUrl: toApiMedia((lesson as any).videoUrl || (lesson as any).videoStoragePath),
+        presentationUrl: toApiMedia((lesson as any).presentationUrl || (lesson as any).presentationStoragePath),
         slides: Array.isArray(lesson.slides)
-          ? lesson.slides.map((s: any) => (s && typeof s === 'object' && s.url ? { ...s, url: toApiMedia(s.url) } : s))
+          ? lesson.slides.map((s: any) => {
+              if (s && typeof s === 'object') {
+                const url = (s as any).url || (s as any).path
+                return url ? { ...s, url: toApiMedia(url) } : s
+              }
+              return s
+            })
           : lesson.slides,
       }
     }),
@@ -441,10 +457,16 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: Authenticat
     title: lesson.title,
     content: lesson.content,
     duration: lesson.duration,
-    videoUrl: toApiMedia(lesson.videoUrl),
-    presentationUrl: toApiMedia(lesson.presentationUrl),
+    videoUrl: toApiMedia((lesson as any).videoUrl || (lesson as any).videoStoragePath),
+    presentationUrl: toApiMedia((lesson as any).presentationUrl || (lesson as any).presentationStoragePath),
     slides: Array.isArray(lesson.slides)
-      ? (lesson.slides as any[]).map((s: any) => (s && typeof s === 'object' && s.url ? { ...s, url: toApiMedia(s.url) } : s))
+      ? (lesson.slides as any[]).map((s: any) => {
+          if (s && typeof s === 'object') {
+            const url = (s as any).url || (s as any).path
+            return url ? { ...s, url: toApiMedia(url) } : s
+          }
+          return s
+        })
       : lesson.slides,
     isFreePreview: lesson.isFreePreview,
     moduleId: lesson.moduleId,

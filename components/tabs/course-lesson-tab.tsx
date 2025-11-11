@@ -43,7 +43,7 @@ export default function CourseLessonTab({
   onBack: () => void
 }) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user, refresh } = useAuth()
   const [canAccess, setCanAccess] = useState<boolean>(false)
   const [marking, setMarking] = useState(false)
   const [completed, setCompleted] = useState(false)
@@ -187,12 +187,20 @@ export default function CourseLessonTab({
 
   const answerLessonQuestion = async (questionId: string, selectedIndex: number) => {
     try {
-      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number }>(`/courses/questions/${questionId}/answer`, {
+      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; xpCrossed100?: boolean; xpAwarded?: number }>(`/courses/questions/${questionId}/answer`, {
         method: "POST",
         body: JSON.stringify({ selectedIndex })
       })
       setLessonQuiz((prev) => prev.map((q) => (q.id === questionId ? { ...q, selectedIndex, isCorrect: res.isCorrect, correctIndex: res.correctIndex } : q)))
-      toast({ title: res.isCorrect ? 'Верно' : 'Неверно', description: res.isCorrect ? 'Отличная работа!' : 'Правильный вариант подсвечен' })
+      if (res.isCorrect) {
+        toast({ title: 'Верно', description: 'Отличная работа!' })
+        await refresh().catch(() => {})
+        if (res.xpCrossed100) {
+          toast({ title: 'ПОЗДРАВЛЯЕМ!', description: 'На вашу почту отправлено кое-что интересное.' })
+        }
+      } else {
+        toast({ title: 'Неверно', description: 'Правильный вариант подсвечен' })
+      }
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответ', variant: 'destructive' as any })
     }
@@ -291,7 +299,7 @@ export default function CourseLessonTab({
                               <button
                                 key={idx}
                                 onClick={() => answerLessonQuestion(q.id, idx)}
-                                disabled={showCorrect}
+                                disabled={showCorrect || Boolean((q as any).answered)}
                                 className={`flex items-center gap-3 rounded-full px-4 py-3 border text-left transition-colors ${
                                   showCorrect
                                     ? isCorrect
