@@ -117,11 +117,11 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   await transporter.sendMail(mailOptions)
 }
 
-export async function sendCertificateEmail(recipientEmail: string, pngBuffer: Buffer, recipientName?: string): Promise<void> {
+export async function sendCertificateEmail(email: string, pngBuffer: Buffer): Promise<void> {
   const mailOptions = {
     from: 'no-reply@s7robotics.space',
-    to: recipientEmail,
-    subject: 'Поздравляем! Ваш сертификат S7 Robotics',
+    to: email,
+    subject: 'Сертификат S7 Robotics',
     html: `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -130,25 +130,20 @@ export async function sendCertificateEmail(recipientEmail: string, pngBuffer: Bu
   <title>Сертификат</title>
   <style>
     body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif; background-color:#0a0a0a; color:#ffffff; margin:0; padding:0; }
-    .container { max-width:640px; margin:0 auto; padding:24px; background-color:#0b0b0b; border:1px dashed #1f1f1f; border-radius:20px; }
+    .container { max-width:600px; margin:0 auto; padding:20px; background-color:#0b0b0b; border:1px dashed #1f1f1f; border-radius:20px; }
     .header { text-align:center; padding:20px 0; }
     .logo { max-width:120px; height:auto; margin:0 auto; display:block; }
-    .content { padding: 6px 0 16px; }
-    .badge { display:inline-block; padding:8px 14px; border-radius:999px; background:#22c55e; color:#000; font-weight:600; margin: 8px 0; }
-    .cta { display:inline-block; padding:12px 18px; background:#F3E6A2; color:#000; border-radius:999px; font-weight:700; text-decoration:none; }
-    .hint { color:#a7a7a7; font-size:12px; }
+    .content { padding: 12px 0; }
   </style>
   </head>
   <body>
     <div class="container">
       <div class="header">
         <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
-        <div class="badge">Поздравляем!</div>
-        <h1 style="margin:8px 0 0;">${recipientName ? ' ' + recipientName + ',' : ''} вы достигли 100 XP</h1>
+        <h1>Поздравляем!</h1>
       </div>
       <div class="content">
-        <p style="line-height:1.6">Отличная работа! Во вложении — ваш именной сертификат S7 Robotics в формате PNG.</p>
-        <p class="hint">Если изображение не отображается, скачайте вложение и откройте его на устройстве.</p>
+        <p>Вы достигли 100 баллов XP. Во вложении — ваш сертификат.</p>
       </div>
     </div>
   </body>

@@ -74,7 +74,7 @@ router.post("/:courseId/questions", requireAuth, async (req: AuthenticatedReques
       text: data.text,
       options: data.options as any,
       correctIndex: data.correctIndex,
-      xpReward: typeof data.xpReward === 'number' ? data.xpReward : 20,
+      xpReward: data.xpReward ?? 100,
       level: data.level ?? 1,
       authorId: req.user!.id,
     },
@@ -133,15 +133,14 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
     if (crossed && before?.email) {
       try {
         const png = await generateCertificate(before.fullName || before.email)
-        await sendCertificateEmail(before.email, png, before.fullName || undefined)
+        await sendCertificateEmail(before.email, png)
       } catch {}
     }
     try {
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
     } catch {}
   }
-  const xpCrossed100 = isCorrect ? ((await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints ?? 0) >= 100 : false
-  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded, xpCrossed100 })
+  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded })
 })
 
 // Daily missions

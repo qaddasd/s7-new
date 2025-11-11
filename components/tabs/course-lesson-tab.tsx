@@ -43,7 +43,7 @@ export default function CourseLessonTab({
   onBack: () => void
 }) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  const { user, refresh } = useAuth()
+  const { user } = useAuth()
   const [canAccess, setCanAccess] = useState<boolean>(false)
   const [marking, setMarking] = useState(false)
   const [completed, setCompleted] = useState(false)
@@ -187,19 +187,12 @@ export default function CourseLessonTab({
 
   const answerLessonQuestion = async (questionId: string, selectedIndex: number) => {
     try {
-      const prevXp = Math.max(0, Number((user as any)?.xp ?? 0))
-      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; xpAwarded?: number }>(`/courses/questions/${questionId}/answer`, {
+      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number }>(`/courses/questions/${questionId}/answer`, {
         method: "POST",
         body: JSON.stringify({ selectedIndex })
       })
       setLessonQuiz((prev) => prev.map((q) => (q.id === questionId ? { ...q, selectedIndex, isCorrect: res.isCorrect, correctIndex: res.correctIndex } : q)))
       toast({ title: res.isCorrect ? 'Верно' : 'Неверно', description: res.isCorrect ? 'Отличная работа!' : 'Правильный вариант подсвечен' })
-      // refresh user to get updated XP and show congrats toast if crossed 100
-      const updated = await refresh()
-      const newXp = Math.max(0, Number(updated?.xp ?? 0))
-      if (prevXp < 100 && newXp >= 100) {
-        toast({ title: 'ПОЗДРАВЛЯЕМ!', description: 'На вашу почту отправлено кое‑что интересное 🎉' })
-      }
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответ', variant: 'destructive' as any })
     }
@@ -298,7 +291,7 @@ export default function CourseLessonTab({
                               <button
                                 key={idx}
                                 onClick={() => answerLessonQuestion(q.id, idx)}
-                                disabled={showCorrect || Boolean(q.answered)}
+                                disabled={showCorrect}
                                 className={`flex items-center gap-3 rounded-full px-4 py-3 border text-left transition-colors ${
                                   showCorrect
                                     ? isCorrect
@@ -308,7 +301,7 @@ export default function CourseLessonTab({
                                         : 'bg-transparent border-[#2a2a35] text-white/80'
                                     : isSelected
                                       ? 'bg-[#1b1b22] border-[#2a2a35] text-white'
-                                      : (q.answered ? 'bg-[#0f0f14] border-[#2a2a35] opacity-60 cursor-not-allowed' : 'bg-[#0f0f14] border-[#2a2a35] hover:bg-[#1a1a22]')
+                                      : 'bg-[#0f0f14] border-[#2a2a35] hover:bg-[#1a1a22]'
                                 }`}
                               >
                                 <span className="w-8 h-8 rounded-full bg-[#00a3ff] text-black flex items-center justify-center font-semibold">

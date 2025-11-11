@@ -22,7 +22,6 @@ interface AuthContextValue {
   login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (patch: Partial<User> & { institution?: string; primaryRole?: string; age?: number }) => Promise<void>
-  refresh: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -68,27 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       primaryRole: data.user.primaryRole,
       age: typeof data.user.age === 'number' ? data.user.age : undefined,
     })
-  }
-
-  const refreshFn = async (): Promise<User | null> => {
-    try {
-      const u = await apiFetch<{ id: string; email: string; role: "USER" | "ADMIN"; fullName?: string; xp?: number; educationalInstitution?: string; primaryRole?: string; age?: number }>("/auth/me")
-      const mapped: User = {
-        id: u.id,
-        email: u.email,
-        fullName: u.fullName,
-        role: u.role === "ADMIN" ? "admin" : "user",
-        level: 1,
-        xp: typeof u.xp === 'number' ? u.xp : 0,
-        educationalInstitution: u.educationalInstitution,
-        primaryRole: u.primaryRole,
-        age: typeof u.age === 'number' ? u.age : undefined,
-      }
-      setUser(mapped)
-      return mapped
-    } catch {
-      return null
-    }
   }
 
   const loginFn = async (email: string, password: string, remember = true) => {
@@ -151,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value = useMemo<AuthContextValue>(() => ({ user, loading, register: registerFn, login: loginFn, logout: logoutFn, updateProfile: updateProfileFn, refresh: refreshFn }), [user, loading])
+  const value = useMemo<AuthContextValue>(() => ({ user, loading, register: registerFn, login: loginFn, logout: logoutFn, updateProfile: updateProfileFn }), [user, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
