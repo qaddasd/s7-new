@@ -86,6 +86,24 @@ if (DEV_AUTH) {
   router.post("/login", async (req: Request, res: Response) => {
     const { email, password } = (req.body || {}) as { email?: string; password?: string }
     if (email === "1" && password === "1") {
+      try {
+        const existing = await prisma.user.findUnique({ where: { id: "dev-admin" }, select: { id: true } })
+        if (!existing) {
+          const pw = await hashPassword("dev")
+          await prisma.user.create({
+            data: {
+              id: "dev-admin",
+              email: "dev-admin@dev.local",
+              passwordHash: pw,
+              fullName: "Dev Admin",
+              role: "ADMIN",
+              emailVerified: true,
+              profile: { create: {} },
+            },
+          })
+        }
+      } catch (e) {
+      }
       const accessToken = signAccessToken("dev-admin", "ADMIN")
       const refreshToken = signRefreshToken("dev-admin", "ADMIN")
       return res.json({

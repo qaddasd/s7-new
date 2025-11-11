@@ -131,6 +131,7 @@ router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
   const clubs = await db.club.findMany({
     where,
     take: limit,
+    orderBy: { createdAt: "desc" },
     include: {
       mentors: { include: { user: { select: { id: true, fullName: true, email: true } } } },
       classes: {
