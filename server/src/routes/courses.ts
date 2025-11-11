@@ -74,7 +74,7 @@ router.post("/:courseId/questions", requireAuth, async (req: AuthenticatedReques
       text: data.text,
       options: data.options as any,
       correctIndex: data.correctIndex,
-      xpReward: data.xpReward ?? 100,
+      xpReward: typeof data.xpReward === 'number' ? data.xpReward : 20,
       level: data.level ?? 1,
       authorId: req.user!.id,
     },
@@ -123,14 +123,13 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   const isCorrect = Number(selectedIndex) === Number(q.correctIndex)
   const ans = await (prisma as any).courseAnswer.create({ data: { questionId, userId: req.user!.id, selectedIndex, isCorrect } })
   let awarded = 0
-  let crossed = false
   if (isCorrect) {
     const reward = Number(q.xpReward || 20)
     awarded = reward
     const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true, email: true, fullName: true } }))
     const beforeXp = Number(before?.experiencePoints || 0)
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
-    crossed = beforeXp < 100 && beforeXp + awarded >= 100
+    const crossed = beforeXp < 100 && beforeXp + awarded >= 100
     if (crossed && before?.email) {
       try {
         const png = await generateCertificate(before.fullName || before.email)
@@ -141,7 +140,8 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
     } catch {}
   }
-  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded, xpCrossed100: crossed })
+  const xpCrossed100 = isCorrect ? ((await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints ?? 0) >= 100 : false
+  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded, xpCrossed100 })
 })
 
 // Daily missions
@@ -413,16 +413,10 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
         duration: lesson.duration,
         orderIndex: lesson.orderIndex,
         isFreePreview: lesson.isFreePreview,
-        videoUrl: toApiMedia((lesson as any).videoUrl || (lesson as any).videoStoragePath),
-        presentationUrl: toApiMedia((lesson as any).presentationUrl || (lesson as any).presentationStoragePath),
+        videoUrl: toApiMedia(lesson.videoUrl),
+        presentationUrl: toApiMedia(lesson.presentationUrl),
         slides: Array.isArray(lesson.slides)
-          ? lesson.slides.map((s: any) => {
-              if (s && typeof s === 'object') {
-                const url = (s as any).url || (s as any).path
-                return url ? { ...s, url: toApiMedia(url) } : s
-              }
-              return s
-            })
+          ? lesson.slides.map((s: any) => (s && typeof s === 'object' && s.url ? { ...s, url: toApiMedia(s.url) } : s))
           : lesson.slides,
       }
     }),
@@ -457,16 +451,10 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: Authenticat
     title: lesson.title,
     content: lesson.content,
     duration: lesson.duration,
-    videoUrl: toApiMedia((lesson as any).videoUrl || (lesson as any).videoStoragePath),
-    presentationUrl: toApiMedia((lesson as any).presentationUrl || (lesson as any).presentationStoragePath),
+    videoUrl: toApiMedia(lesson.videoUrl),
+    presentationUrl: toApiMedia(lesson.presentationUrl),
     slides: Array.isArray(lesson.slides)
-      ? (lesson.slides as any[]).map((s: any) => {
-          if (s && typeof s === 'object') {
-            const url = (s as any).url || (s as any).path
-            return url ? { ...s, url: toApiMedia(url) } : s
-          }
-          return s
-        })
+      ? (lesson.slides as any[]).map((s: any) => (s && typeof s === 'object' && s.url ? { ...s, url: toApiMedia(s.url) } : s))
       : lesson.slides,
     isFreePreview: lesson.isFreePreview,
     moduleId: lesson.moduleId,
