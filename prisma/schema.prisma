@@ -109,6 +109,7 @@ model User {
   attendanceStudent  Attendance[]      @relation("AttendanceStudent")
   attendanceMarker   Attendance[]      @relation("AttendanceMarker")
   assignmentSubmissions AssignmentSubmission[]
+  clubQuizSubmissions ClubQuizSubmission[]
   newsArticles       News[]            @relation("NewsAuthor")
   kruzhoksOwned      Kruzhok[]         @relation(name: "KruzhokOwner")
   kruzhokSubscriptions KruzhokSubscription[]
@@ -495,15 +496,15 @@ model ClubSessionQuiz {
 
 model ClubQuizSubmission {
   id          String   @id @default(cuid())
-  session     ClubSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId   String
+  quiz        ClubSessionQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId      String
   student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId   String
   answers     Json
   score       Int      @default(0)
   submittedAt DateTime @default(now())
 
-  @@unique([sessionId, studentId])
+  @@unique([quizId, studentId])
 }
 
 model Attendance {
