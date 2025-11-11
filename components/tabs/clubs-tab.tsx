@@ -103,7 +103,8 @@ export default function ClubsTab() {
     setLoading(true)
     setLoadError(null)
     try {
-      const list = await apiFetch<Club[]>("/api/clubs/mine")
+      const isAdmin = String(user?.role || '').toUpperCase() === 'ADMIN'
+      const list = await apiFetch<Club[]>(`/api/clubs/mine?limit=${isAdmin ? 30 : 100}`)
       setClubs(list)
     } catch (e: any) {
       setClubs([])
@@ -114,7 +115,8 @@ export default function ClubsTab() {
   }
   const refreshClubsSilently = async () => {
     try {
-      const list = await apiFetch<Club[]>("/api/clubs/mine")
+      const isAdmin = String(user?.role || '').toUpperCase() === 'ADMIN'
+      const list = await apiFetch<Club[]>(`/api/clubs/mine?limit=${isAdmin ? 30 : 100}`)
       setClubs(list)
       setLoadError(null)
     } catch (e: any) {
@@ -187,14 +189,10 @@ export default function ClubsTab() {
     if (!name.trim()) return
     try {
       setCreating(true)
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
-      const created = await Promise.race([
-        apiFetch<Club>("/api/clubs", {
-          method: "POST",
-          body: JSON.stringify({ name: name.trim(), description: desc.trim() || undefined, location: location.trim() || undefined })
-        }),
-        timeout
-      ]) as Club
+      const created = await apiFetch<Club>("/api/clubs", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), description: desc.trim() || undefined, location: location.trim() || undefined })
+      })
       setName("")
       setLocation("")
       setDesc("")
@@ -213,11 +211,7 @@ export default function ClubsTab() {
     if (!code) return
     try {
       setJoining(true)
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
-      await Promise.race([
-        apiFetch(`/api/clubs/join-by-code`, { method: "POST", body: JSON.stringify({ code }) }),
-        timeout
-      ])
+      await apiFetch(`/api/clubs/join-by-code`, { method: "POST", body: JSON.stringify({ code }) })
       toast({ title: "Готово", description: "Вы присоединились к кружку" } as any)
       setJoinOpen(false); setJoinCode("")
       refreshClubsSilently().catch(()=>{})
@@ -1055,11 +1049,7 @@ export default function ClubsTab() {
                   const payload = newClass[c.id]
                   if (!payload?.title?.trim()) return
                   try {
-                    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Таймаут (10с)")), 10000))
-                    await Promise.race([
-                      apiFetch(`/api/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) }),
-                      timeout
-                    ])
+                    await apiFetch(`/api/clubs/${c.id}/classes`, { method: "POST", body: JSON.stringify({ title: payload.title.trim(), description: payload.description?.trim() || undefined, location: payload.location?.trim() || undefined }) })
                     setNewClass(prev=>{ const n={...prev}; delete n[c.id]; return n })
                     await load()
                     toast({ title: 'Класс создан' } as any)

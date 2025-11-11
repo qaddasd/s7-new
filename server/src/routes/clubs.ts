@@ -113,6 +113,11 @@ router.post("/classes/:classId/sessions", async (req: AuthenticatedRequest, res:
 router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user!.id
   const isAdmin = req.user!.role === "ADMIN"
+  const limit = (() => {
+    const raw = Number(((req as any).query?.limit) || (isAdmin ? 30 : 100))
+    if (!Number.isFinite(raw) || raw <= 0) return isAdmin ? 30 : 100
+    return Math.min(200, Math.max(1, Math.floor(raw)))
+  })()
   const where = isAdmin
     ? { isActive: true }
     : {
@@ -125,13 +130,14 @@ router.get("/mine", async (req: AuthenticatedRequest, res: Response) => {
       }
   const clubs = await db.club.findMany({
     where,
+    take: limit,
     include: {
-      mentors: { include: { user: true } },
+      mentors: { include: { user: { select: { id: true, fullName: true, email: true } } } },
       classes: {
         include: {
-          enrollments: { include: { user: true } },
+          enrollments: { include: { user: { select: { id: true, fullName: true, email: true } } } },
           scheduleItems: true,
-          sessions: { orderBy: { date: "desc" }, take: 5, include: { attendances: true } },
+          sessions: { orderBy: { date: "desc" }, take: 5, include: { attendances: { select: { studentId: true, status: true } } } },
         }
       }
     }
