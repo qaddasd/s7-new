@@ -105,7 +105,23 @@ export default function AdminCourses() {
 
   return (
     <main className="flex-1 p-6 md:p-8 overflow-y-auto animate-slide-up">
-      <h2 className="text-[var(--color-text-1)] text-xl font-medium mb-6">Курсы</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-[var(--color-text-1)] text-xl font-medium">Курсы</h2>
+        <div className="flex items-center gap-3">
+          <Link 
+            href={`/admin/courses/new-step?fresh=1&draft=${encodeURIComponent(draftId)}`}
+            className="rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium px-4 py-2 text-sm"
+          >
+            Новый курс (шаг за шагом)
+          </Link>
+          <Link 
+            href={`/admin/courses/new?fresh=1&draft=${encodeURIComponent(draftId)}`}
+            className="rounded-full bg-[var(--color-surface-2)] border border-[var(--color-border-2)] text-[var(--color-text-1)] hover:bg-[var(--color-surface-3)] font-medium px-4 py-2 text-sm"
+          >
+            Новый курс (классический)
+          </Link>
+        </div>
+      </div>
       
       <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-4 text-[var(--color-text-1)] mb-6">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
@@ -140,15 +156,7 @@ export default function AdminCourses() {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Link href={`/admin/courses/new?fresh=1&draft=${encodeURIComponent(draftId)}`} className="block">
-          <div className="bg-[var(--color-surface-2)] border border-[var(--color-border-1)] rounded-2xl p-6 text-[var(--color-text-1)] relative hover:bg-[var(--color-surface-3)] hover:border-[var(--color-border-hover-1)] transition-all duration-[var(--dur-mid)]">
-            <div className="absolute top-4 right-4 text-[var(--color-text-3)]">
-              <ArrowUpRight className="w-6 h-6" />
-            </div>
-            <div className="text-[var(--color-text-1)] text-lg font-medium">Создать курс</div>
-          </div>
-        </Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {loading ? (
           <div className="text-[var(--color-text-3)]">Загрузка...</div>
         ) : courses.length === 0 ? (

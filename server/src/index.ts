@@ -9,6 +9,7 @@ import { prisma } from "./db"
 import { router as authRouter } from "./routes/auth"
 import { router as courseRouter } from "./routes/courses"
 import { router as adminRouter } from "./routes/admin"
+import { router as adminCoursesRouter } from "./routes/admin-courses"
 import { router as eventsRouter } from "./routes/events"
 import { router as submissionsRouter } from "./routes/submissions"
 import { router as achievementsRouter } from "./routes/achievements"
@@ -77,6 +78,7 @@ app.use("/api/auth", authRouter)
 app.use("/courses", courseRouter)
 app.use("/api/courses", courseRouter)
 app.use("/api/admin", adminRouter)
+app.use("/api/admin-courses", adminCoursesRouter)
 app.use("/events", eventsRouter)
 app.use("/api/events", eventsRouter)
 app.use("/submissions", submissionsRouter)
