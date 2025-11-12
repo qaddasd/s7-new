@@ -88,8 +88,20 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (!course) return res.status(404).json({ error: "Course not found" })
 
   if (req.user?.role !== "ADMIN") {
+    // Auto-enroll user in free courses
+    if (req.user?.id && (course.isFree || !course.price || Number(course.price) === 0)) {
+      const existingEnrollment = await prisma.enrollment.findFirst({ 
+        where: { userId: req.user.id, courseId } 
+      })
+      if (!existingEnrollment) {
+        await prisma.enrollment.create({ 
+          data: { userId: req.user.id, courseId } 
+        })
+      }
+    }
+    
     const hasAccess = await userHasCourseAccess(req.user?.id, course)
-    if (!hasAccess) return res.status(403).json({ error: "No access" })
+    if (!hasAccess && !course.isFree) return res.status(403).json({ error: "No access" })
   }
 
   const { moduleId, lessonId } = req.query as any
@@ -446,6 +458,19 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
   if (!course) return res.status(404).json({ error: "Course not found" })
 
   const isAdmin = (req.user as any)?.role === "ADMIN"
+  
+  // Auto-enroll user in free courses
+  if (req.user?.id && (course.isFree || !course.price || Number(course.price) === 0)) {
+    const existingEnrollment = await prisma.enrollment.findFirst({ 
+      where: { userId: req.user.id, courseId } 
+    })
+    if (!existingEnrollment) {
+      await prisma.enrollment.create({ 
+        data: { userId: req.user.id, courseId } 
+      })
+    }
+  }
+  
   const hasAccess = isAdmin ? true : await userHasCourseAccess(req.user?.id, course)
 
   const safeModules = course.modules.map((module) => ({
@@ -454,7 +479,7 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
     description: module.description,
     orderIndex: module.orderIndex,
     lessons: module.lessons.map((lesson: any) => {
-      if (!(hasAccess || lesson.isFreePreview)) {
+      if (!(hasAccess || lesson.isFreePreview || course.isFree)) {
         return {
           id: lesson.id,
           title: lesson.title,
@@ -499,6 +524,19 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: Authenticat
   if (!lesson || lesson.module.courseId !== courseId) return res.status(404).json({ error: "Lesson not found" })
 
   const isAdmin = (req.user as any)?.role === "ADMIN"
+  
+  // Auto-enroll user in free courses
+  if (req.user?.id && (lesson.module.course.isFree || !lesson.module.course.price || Number(lesson.module.course.price) === 0)) {
+    const existingEnrollment = await prisma.enrollment.findFirst({ 
+      where: { userId: req.user.id, courseId: lesson.module.courseId } 
+    })
+    if (!existingEnrollment) {
+      await prisma.enrollment.create({ 
+        data: { userId: req.user.id, courseId: lesson.module.courseId } 
+      })
+    }
+  }
+  
   const hasAccess = isAdmin ? true : await userHasCourseAccess(req.user?.id, lesson.module.course)
   if (!hasAccess && !lesson.isFreePreview) return res.status(403).json({ error: "Lesson requires purchase" })
 

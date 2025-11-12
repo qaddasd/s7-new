@@ -114,13 +114,18 @@ export default function CourseLessonTab({
   useEffect(() => {
     let alive = true
     ;(async () => {
+      console.log('Loading lesson content:', lesson)
       if ((lesson as any)?.videoUrl) {
-        setVideoUrl(resolveMediaUrl((lesson as any).videoUrl))
+        const url = resolveMediaUrl((lesson as any).videoUrl)
+        console.log('Setting video URL from videoUrl:', url)
+        if (alive) setVideoUrl(url)
       } else if (lesson?.videoMediaId) {
         const url = await getObjectUrl(lesson.videoMediaId)
+        console.log('Setting video URL from videoMediaId:', url)
         if (alive) setVideoUrl(url)
       } else {
-        setVideoUrl(null)
+        console.log('No video URL found')
+        if (alive) setVideoUrl(null)
       }
 
       const serverSlides = (lesson as any)?.serverSlides || (lesson as any)?.slides
@@ -129,18 +134,24 @@ export default function CourseLessonTab({
           .map((s: any) => (typeof s === 'string' ? s : s?.url))
           .filter(Boolean)
           .map((u: string) => resolveMediaUrl(u))
-        setSlideUrls(urls)
+        console.log('Setting slide URLs from serverSlides:', urls)
+        if (alive) setSlideUrls(urls)
       } else if (Array.isArray(lesson?.slideMediaIds) && lesson!.slideMediaIds!.length) {
         const urls = await Promise.all(lesson!.slideMediaIds!.map((id) => getObjectUrl(id)))
+        console.log('Setting slide URLs from slideMediaIds:', urls)
         if (alive) setSlideUrls(urls)
       } else {
-        setSlideUrls([])
+        console.log('No slide URLs found')
+        if (alive) setSlideUrls([])
       }
 
       if ((lesson as any)?.presentationUrl) {
-        setPresUrl(resolveMediaUrl((lesson as any).presentationUrl))
+        const url = resolveMediaUrl((lesson as any).presentationUrl)
+        console.log('Setting presentation URL from presentationUrl:', url)
+        if (alive) setPresUrl(url)
       } else if (lesson?.presentationMediaId) {
         const url = await getObjectUrl(lesson.presentationMediaId)
+        console.log('Setting presentation URL from presentationMediaId:', url)
         if (alive) setPresUrl(url)
       } else {
         setPresUrl(null)
@@ -153,8 +164,10 @@ export default function CourseLessonTab({
     let ignore = false
     if (!course?.id || !lesson?.id) return
     const lid = String((lesson as any).id)
+    console.log('Loading lesson data for:', course.id, lid)
     apiFetch<any>(`/courses/${course.id}/lessons/${encodeURIComponent(lid)}`)
       .then((data) => {
+        console.log('Lesson data received:', data)
         if (ignore || !data) return
         setCanAccess((prev) => prev || true)
         if (typeof data.content === 'string') setLessonContent(data.content)
@@ -179,9 +192,16 @@ export default function CourseLessonTab({
     if (!course?.id || moduleId == null || lessonId == null) { setLessonQuiz([]); return }
     setLoadingQuiz(true)
     const params = new URLSearchParams({ lessonId: String(lessonId) })
+    console.log('Loading questions for:', course.id, lessonId)
     apiFetch<Array<any>>(`/courses/${course.id}/questions?${params.toString()}`)
-      .then((list) => setLessonQuiz(list || []))
-      .catch(() => setLessonQuiz([]))
+      .then((list) => {
+        console.log('Questions received:', list)
+        setLessonQuiz(list || [])
+      })
+      .catch((err) => {
+        console.error('Failed to load questions:', err)
+        setLessonQuiz([])
+      })
       .finally(() => setLoadingQuiz(false))
   }, [course?.id, moduleId, lessonId])
 
