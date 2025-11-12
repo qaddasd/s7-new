@@ -117,6 +117,8 @@ model User {
   kruzhokAttendanceMarked KruzhokAttendance[]
   // Opposite side for DailyMissionProgress.user
   dailyMissionProgress    DailyMissionProgress[]
+  // Opposite side for ClubQuizSubmission.student
+  clubQuizSubmissions     ClubQuizSubmission[]
 }
 
 model Session {
@@ -476,6 +478,8 @@ model ClubSession {
 
   // Quiz snapshot for the session
   quiz           ClubSessionQuiz?
+  // Quiz submissions for this session
+  quizSubmissions ClubQuizSubmission[]
 
   @@index([classId, date])
   @@unique([classId, date, scheduleItemId])
@@ -497,6 +501,8 @@ model ClubQuizSubmission {
   id          String   @id @default(cuid())
   session     ClubSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sessionId   String
+  quiz        ClubSessionQuiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId      String
   student     User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   studentId   String
   answers     Json
@@ -613,6 +619,8 @@ model CourseAnswer {
   selectedIndex Int
   isCorrect    Boolean
   createdAt    DateTime @default(now())
+  
+  @@unique([questionId, userId])
 }
 
 // Daily Missions per course with per-user daily progress

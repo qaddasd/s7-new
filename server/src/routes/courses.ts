@@ -17,7 +17,8 @@ import { prisma } from "../db"
 import { optionalAuth, requireAuth } from "../middleware/auth"
 import { requireAdmin } from "../middleware/auth"
 import type { AuthenticatedRequest } from "../types"
-import { sendCertificate } from "../utils/certificate"
+import { generateCertificate, saveCertificate } from '../utils/certificate'
+import { sendCertificateEmail } from '../utils/email'
 
 export const router = Router()
 
@@ -101,41 +102,30 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (level) where.level = Number(level)
   if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
-
-  let answersByQ = new Map<string, any>()
-  if (req.user?.id && Array.isArray(list) && list.length > 0) {
-    const qids = list.map((q: any) => q.id)
-    const answers = await (prisma as any).courseAnswer.findMany({
-      where: { questionId: { in: qids }, userId: req.user!.id },
-      orderBy: { createdAt: "desc" },
+  
+  // Include user answer status if user is authenticated
+  let result = list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level }))
+  
+  if (req.user?.id) {
+    const questionIds = list.map((q: any) => q.id)
+    const userAnswers = await (prisma as any).courseAnswer.findMany({
+      where: { questionId: { in: questionIds }, userId: req.user.id },
+      select: { questionId: true, selectedIndex: true, isCorrect: true }
     })
-    for (const a of answers) {
-      if (!answersByQ.has(a.questionId)) {
-        answersByQ.set(a.questionId, a)
+    
+    const answerMap = new Map(userAnswers.map((a: any) => [a.questionId, a]))
+    result = result.map((q: any) => {
+      const userAnswer = answerMap.get(q.id)
+      return {
+        ...q,
+        userAnswered: !!userAnswer,
+        userSelectedIndex: userAnswer?.selectedIndex,
+        userAnswerCorrect: userAnswer?.isCorrect
       }
-    }
+    })
   }
-
-  res.json(
-    list.map((q: any) => {
-      const ans = answersByQ.get(String(q.id)) as any | undefined
-      if (ans) {
-        return {
-          id: q.id,
-          text: q.text,
-          options: q.options,
-          moduleId: q.moduleId,
-          lessonId: q.lessonId,
-          xpReward: q.xpReward,
-          level: q.level,
-          selectedIndex: ans.selectedIndex,
-          isCorrect: Boolean(ans.isCorrect),
-          correctIndex: q.correctIndex,
-        }
-      }
-      return { id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level }
-    })
-  )
+  
+  res.json(result)
 })
 
 router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -144,20 +134,13 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   const q = await (prisma as any).courseQuestion.findUnique({ where: { id: questionId } })
   if (!q) return res.status(404).json({ error: "Question not found" })
   
-  // Проверка на уже правильно отвеченный вопрос
-  const existingCorrectAnswer = await (prisma as any).courseAnswer.findFirst({
-    where: { questionId, userId: req.user!.id, isCorrect: true }
+  // Check if user already answered this question
+  const existingAnswer = await (prisma as any).courseAnswer.findUnique({
+    where: { questionId_userId: { questionId, userId: req.user!.id } }
   })
-  if (existingCorrectAnswer) {
-    return res.status(200).json({ 
-      isCorrect: true,
-      answerId: existingCorrectAnswer.id, 
-      selectedIndex: existingCorrectAnswer.selectedIndex,
-      correctIndex: q.correctIndex, 
-      xpAwarded: 0,
-      alreadyAnswered: true,
-      message: "Вы уже правильно ответили на этот вопрос" 
-    })
+  
+  if (existingAnswer) {
+    return res.status(400).json({ error: "Вы уже ответили на этот вопрос", answerId: existingAnswer.id, isCorrect: existingAnswer.isCorrect, correctIndex: q.correctIndex })
   }
   
   const isCorrect = Number(selectedIndex) === Number(q.correctIndex)
@@ -166,27 +149,47 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   })
   let awarded = 0
   if (isCorrect) {
-    // Используем xpReward из вопроса
-    const reward = Number(q.xpReward) || 20
+    // Unified reward for correct answer
+    const reward = 20
     awarded = reward
-    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true, email: true, fullName: true } }))?.experiencePoints || 0
+    const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints || 0
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
-    const afterXP = Number(before) + Number(awarded)
-    const crossed = Number(before) < 100 && afterXP >= 100
+    const crossed = Number(before) < 100 && Number(before) + Number(awarded) >= 100
     if (crossed) {
-      // Отправка сертификата
-      try {
-        const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true, fullName: true } })
-        if (user) {
-          await sendCertificate(user.email, user.fullName)
-        }
-      } catch (err) {
-        console.error("Failed to send certificate:", err)
-      }
-      // Уведомление админам
       const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
       for (const a of admins) {
         await (prisma as any).notification.create({ data: { userId: a.id, title: "Достигнут порог XP", message: `Пользователь достиг >=100 XP: ${req.user!.id}`, type: "certificate" } })
+      }
+      
+      // Generate and send certificate
+      try {
+        const user = await prisma.user.findUnique({ 
+          where: { id: req.user!.id }, 
+          select: { email: true, firstName: true, lastName: true } 
+        })
+        
+        if (user && user.email && user.firstName && user.lastName) {
+          const course = await prisma.course.findUnique({ 
+            where: { id: q.courseId }, 
+            select: { title: true } 
+          })
+          
+          const fullName = `${user.firstName} ${user.lastName}`
+          const courseName = course?.title || 'Курс S7 Robotics'
+          
+          // Generate certificate
+          const certificateBuffer = await generateCertificate({
+            fullName,
+            courseName,
+            date: new Date()
+          })
+          
+          // Send certificate email
+          await sendCertificateEmail(user.email, fullName, courseName, certificateBuffer)
+        }
+      } catch (error) {
+        console.error('Error generating/sending certificate:', error)
+        // Don't fail the answer submission if certificate generation fails
       }
     }
     // increment daily missions progress for this course (type: correct_answers)

@@ -117,6 +117,100 @@ export async function sendVerificationEmail(email: string, code: string): Promis
   await transporter.sendMail(mailOptions)
 }
 
+// Send certificate email with attachment
+export async function sendCertificateEmail(email: string, fullName: string, courseName: string, certificateBuffer: Buffer): Promise<void> {
+  const mailOptions = {
+    from: 'no-reply@s7robotics.space',
+    to: email,
+    subject: 'Поздравляем! Вы получили сертификат S7 Robotics',
+    html: `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сертификат S7 Robotics</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #0a0a0a;
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #0b0b0b;
+      border: 1px dashed #1f1f1f;
+      border-radius: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      width: 150px;
+      height: auto;
+      margin-bottom: 20px;
+    }
+    .content {
+      padding: 20px 0;
+    }
+    .certificate-info {
+      background-color: #1a1a1a;
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #333;
+      color: #888;
+      font-size: 14px;
+    }
+    .highlight {
+      color: #00ff88;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://s7robotics.space/logo-s7.png" alt="S7 Robotics Logo" class="logo">
+      <h1>Поздравляем!</h1>
+    </div>
+    <div class="content">
+      <p>Уважаемый(ая) <span class="highlight">${fullName}</span>,</p>
+      <p>Мы рады сообщить вам, что вы успешно завершили курс <span class="highlight">"${courseName}"</span> и получили сертификат!</p>
+      <div class="certificate-info">
+        <p>Ваш сертификат прикреплен к этому письму.</p>
+        <p>Вы можете распечатать его или сохранить для своих записей.</p>
+      </div>
+      <p>Поздравляем с достижением! Продолжайте в том же духе и развивайте свои навыки вместе с S7 Robotics.</p>
+    </div>
+    <div class="footer">
+      <p>© 2025 S7 Robotics. Все права защищены.</p>
+    </div>
+  </div>
+</body>
+</html>`,
+    attachments: [
+      {
+        filename: `certificate-${fullName.replace(/\s+/g, '-')}-${Date.now()}.png`,
+        content: certificateBuffer,
+        contentType: 'image/png'
+      }
+    ]
+  }
+
+  await transporter.sendMail(mailOptions)
+}
+
 // Send password reset email
 export async function sendPasswordResetEmail(email: string, code: string): Promise<void> {
   const mailOptions = {

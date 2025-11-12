@@ -187,10 +187,16 @@ export default function CourseLessonTab({
 
   const answerLessonQuestion = async (questionId: string, selectedIndex: number) => {
     try {
-      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number }>(`/courses/questions/${questionId}/answer`, {
+      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; error?: string }>(`/courses/questions/${questionId}/answer`, {
         method: "POST",
         body: JSON.stringify({ selectedIndex })
       })
+      
+      if (res.error) {
+        toast({ title: 'Ошибка', description: res.error, variant: 'destructive' as any })
+        return
+      }
+      
       setLessonQuiz((prev) => prev.map((q) => (q.id === questionId ? { ...q, selectedIndex, isCorrect: res.isCorrect, correctIndex: res.correctIndex } : q)))
       toast({ title: res.isCorrect ? 'Верно' : 'Неверно', description: res.isCorrect ? 'Отличная работа!' : 'Правильный вариант подсвечен' })
     } catch (e: any) {
@@ -284,16 +290,17 @@ export default function CourseLessonTab({
                         <div className="text-white/80">{q.text}</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {(q.options || []).map((opt: string, idx: number) => {
-                            const isSelected = q.selectedIndex === idx
+                            const isSelected = q.selectedIndex === idx || q.userSelectedIndex === idx
                             const isCorrect = q.correctIndex === idx
-                            const showCorrect = typeof q.correctIndex === 'number'
+                            const showCorrect = typeof q.correctIndex === 'number' || q.userAnswered
+                            const userAnsweredCorrectly = q.userAnswerCorrect
                             return (
                               <button
                                 key={idx}
-                                onClick={() => answerLessonQuestion(q.id, idx)}
-                                disabled={showCorrect}
+                                onClick={() => !q.userAnswered && answerLessonQuestion(q.id, idx)}
+                                disabled={q.userAnswered}
                                 className={`flex items-center gap-3 rounded-full px-4 py-3 border text-left transition-colors ${
-                                  showCorrect
+                                  q.userAnswered
                                     ? isCorrect
                                       ? 'bg-[#22c55e]/15 border-[#22c55e]/40 text-white'
                                       : isSelected
