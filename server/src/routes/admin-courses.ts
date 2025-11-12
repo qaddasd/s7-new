@@ -8,6 +8,34 @@ export const router = Router()
 
 router.use(requireAuth, requireAdmin)
 
+// Get course details with modules and lessons
+router.get("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId } = req.params
+  
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: {
+        modules: {
+          orderBy: { orderIndex: "asc" },
+          include: {
+            lessons: {
+              orderBy: { orderIndex: "asc" },
+            },
+          },
+        },
+      },
+    })
+    
+    if (!course) return res.status(404).json({ error: "Course not found" })
+    
+    return res.json(course)
+  } catch (error) {
+    console.error("Error loading course:", error)
+    return res.status(500).json({ error: "Failed to load course" })
+  }
+})
+
 // Schema for individual question creation
 const questionSchema = z.object({
   text: z.string().min(1),

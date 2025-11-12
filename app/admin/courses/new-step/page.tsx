@@ -51,7 +51,7 @@ export default function Page() {
     
     const loadCourse = async () => {
       try {
-        const course = await apiFetch<any>(`/api/admin/courses/${editId}`)
+        const course = await apiFetch<any>(`/api/admin-courses/${editId}`)
         if (course) {
           setTitle(course.title || "")
           setAuthor(course.author || "")
@@ -225,7 +225,7 @@ export default function Page() {
       return
     }
     
-    router.push(`/admin/courses/new/${moduleId}?edit=${courseId}`)
+    router.push(`/admin/courses/new-step/${moduleId}?edit=${courseId}`)
   }
 
   const publish = async () => {

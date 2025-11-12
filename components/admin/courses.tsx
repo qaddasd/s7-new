@@ -68,7 +68,7 @@ function CourseCard({ id, title, level, price, lessonsCount, onDeleted }: { id: 
         </button>
       </div>
       <Link
-        href={`/admin/courses/new?edit=${encodeURIComponent(id)}`}
+        href={`/admin/courses/new-step?edit=${encodeURIComponent(id)}`}
         className="absolute bottom-4 right-4 text-xs bg-[var(--color-surface-3)] text-[var(--color-text-2)] rounded-full px-3 py-1 hover:bg-[var(--color-border-hover-1)] transition-colors duration-[var(--dur-fast)]"
       >
         Редакт.

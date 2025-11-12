@@ -52,7 +52,7 @@ export default function Page() {
     const loadLesson = async () => {
       try {
         // Get course with modules and lessons
-        const course = await apiFetch<any>(`/api/admin/courses/${courseId}`)
+        const course = await apiFetch<any>(`/api/admin-courses/${courseId}`)
         if (!course || !course.modules) {
           toast({ title: "Ошибка", description: "Курс не найден", variant: "destructive" })
           return
