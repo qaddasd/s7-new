@@ -101,7 +101,41 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (level) where.level = Number(level)
   if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
-  res.json(list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level })))
+
+  let answersByQ = new Map<string, any>()
+  if (req.user?.id && Array.isArray(list) && list.length > 0) {
+    const qids = list.map((q: any) => q.id)
+    const answers = await (prisma as any).courseAnswer.findMany({
+      where: { questionId: { in: qids }, userId: req.user!.id },
+      orderBy: { createdAt: "desc" },
+    })
+    for (const a of answers) {
+      if (!answersByQ.has(a.questionId)) {
+        answersByQ.set(a.questionId, a)
+      }
+    }
+  }
+
+  res.json(
+    list.map((q: any) => {
+      const ans = answersByQ.get(String(q.id)) as any | undefined
+      if (ans) {
+        return {
+          id: q.id,
+          text: q.text,
+          options: q.options,
+          moduleId: q.moduleId,
+          lessonId: q.lessonId,
+          xpReward: q.xpReward,
+          level: q.level,
+          selectedIndex: ans.selectedIndex,
+          isCorrect: Boolean(ans.isCorrect),
+          correctIndex: q.correctIndex,
+        }
+      }
+      return { id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level }
+    })
+  )
 })
 
 router.post("/questions/:questionId/answer", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -116,10 +150,12 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
   })
   if (existingCorrectAnswer) {
     return res.status(200).json({ 
-      isCorrect: false, 
+      isCorrect: true,
       answerId: existingCorrectAnswer.id, 
+      selectedIndex: existingCorrectAnswer.selectedIndex,
       correctIndex: q.correctIndex, 
       xpAwarded: 0,
+      alreadyAnswered: true,
       message: "Вы уже правильно ответили на этот вопрос" 
     })
   }

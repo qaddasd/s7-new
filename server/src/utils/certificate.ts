@@ -39,19 +39,21 @@ export async function generateCertificate(fullName: string): Promise<Buffer> {
   // Настраиваем шрифт для ФИО
   ctx.font = '26px Arial'
   ctx.fillStyle = '#000000' // Черный цвет текста
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
+  // По ТЗ координаты: x = (width - text_width) / 2, y = 280
+  // Используем выравнивание по левому краю и явный расчёт x
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
   
   // Измеряем ширину текста
   const textMetrics = ctx.measureText(fullName)
   const textWidth = textMetrics.width
   
-  // Центрируем горизонтально
-  const x = (842 - textWidth) / 2
+  // Центрируем горизонтально вручную и фиксируем вертикальную позицию
+  const x = Math.floor((842 - textWidth) / 2)
   const y = 280
   
-  // Рисуем текст
-  ctx.fillText(fullName, 842 / 2, y) // Используем center alignment
+  // Рисуем текст в рассчитанных координатах
+  ctx.fillText(fullName, x, y)
   
   // Возвращаем буфер
   return canvas.toBuffer('image/png')
