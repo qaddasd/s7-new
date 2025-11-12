@@ -96,7 +96,21 @@ function DashboardInner() {
           difficulty: data.difficulty || "",
           author: (data.author?.fullName ?? data.author) as any,
           price: Number(data.price || 0),
-          modules: (data.modules || []).map((m: any) => ({ id: m.id, title: m.title, lessons: (m.lessons || []).map((l: any) => ({ id: l.id, title: l.title })) })),
+          modules: (data.modules || []).map((m: any) => ({ 
+            id: m.id, 
+            title: m.title, 
+            lessons: (m.lessons || []).map((l: any) => ({ 
+              id: l.id, 
+              title: l.title,
+              content: l.content,
+              duration: l.duration,
+              isFreePreview: l.isFreePreview,
+              videoUrl: l.videoUrl,
+              presentationUrl: l.presentationUrl,
+              slides: l.slides,
+              contentType: l.contentType,
+            })) 
+          })),
         }
         setSelectedCourse(mapped)
         setActiveTab("course-details")

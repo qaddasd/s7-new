@@ -20,6 +20,9 @@ export interface CourseLesson {
   videoUrl?: string
   presentationUrl?: string
   serverSlides?: any
+  duration?: string
+  isFreePreview?: boolean
+  contentType?: string
 }
 
 export interface CourseModule {
