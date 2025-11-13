@@ -63,6 +63,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const enableAnalytics = process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true' || process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === '1'
   return (
     <html lang="en" className="dark">
       <body className={`font-sans ${inter.variable} ${jetbrains.variable}`}>
@@ -75,7 +76,7 @@ export default function RootLayout({
             <EntryToasts />
           </ConfirmProvider>
         </AuthProvider>
-        <Analytics />
+        {enableAnalytics && <Analytics />}
       </body>
     </html>
   )

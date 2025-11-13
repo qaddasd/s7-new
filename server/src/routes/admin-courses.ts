@@ -3,6 +3,7 @@ import { z } from "zod"
 import { prisma } from "../db"
 import { requireAuth, requireAdmin } from "../middleware/auth"
 import type { AuthenticatedRequest } from "../types"
+import { Prisma } from "@prisma/client"
 
 export const router = Router()
 
@@ -166,21 +167,12 @@ router.put("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
   
   try {
     if (syncMode) {
-      // Sync mode - update existing structure with IDs
       const course = await prisma.course.findUnique({
         where: { id: courseId },
-        include: {
-          modules: {
-            include: {
-              lessons: true,
-            },
-          },
-        },
+        include: { modules: { include: { lessons: true } } },
       })
-      
       if (!course) return res.status(404).json({ error: "Course not found" })
-      
-      // Update course basic info
+
       await prisma.course.update({
         where: { id: courseId },
         data: {
@@ -193,42 +185,69 @@ router.put("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
           totalModules: data.modules.length,
         },
       })
-      
-      // Process modules and lessons
+
       for (const moduleData of data.modules) {
         if (moduleData.id) {
-          // Update existing module
-          await prisma.courseModule.update({
-            where: { id: moduleData.id },
-            data: {
-              title: moduleData.title,
-              orderIndex: moduleData.orderIndex,
-            },
-          })
-          
-          // Process lessons
+          let targetModuleId = moduleData.id
+          try {
+            await prisma.courseModule.update({
+              where: { id: moduleData.id },
+              data: { title: moduleData.title, orderIndex: moduleData.orderIndex },
+            })
+          } catch (e: any) {
+            if (e && (e as Prisma.PrismaClientKnownRequestError).code === 'P2025') {
+              const created = await prisma.courseModule.create({
+                data: { courseId, title: moduleData.title, orderIndex: moduleData.orderIndex },
+              })
+              targetModuleId = created.id
+              console.warn('Module not found, created instead:', moduleData.id)
+            } else {
+              throw e
+            }
+          }
+
           for (const lessonData of moduleData.lessons) {
             if (lessonData.id) {
-              // Update existing lesson
-              await prisma.lesson.update({
-                where: { id: lessonData.id },
-                data: {
-                  title: lessonData.title,
-                  content: lessonData.content,
-                  duration: lessonData.duration,
-                  orderIndex: lessonData.orderIndex,
-                  isFreePreview: lessonData.isFreePreview,
-                  videoUrl: lessonData.videoUrl,
-                  presentationUrl: lessonData.presentationUrl,
-                  slides: lessonData.slides || [],
-                  contentType: lessonData.contentType,
-                },
-              })
+              try {
+                await prisma.lesson.update({
+                  where: { id: lessonData.id },
+                  data: {
+                    title: lessonData.title,
+                    content: lessonData.content,
+                    duration: lessonData.duration,
+                    orderIndex: lessonData.orderIndex,
+                    isFreePreview: lessonData.isFreePreview,
+                    videoUrl: lessonData.videoUrl,
+                    presentationUrl: lessonData.presentationUrl,
+                    slides: lessonData.slides || [],
+                    contentType: lessonData.contentType,
+                  },
+                })
+              } catch (e: any) {
+                if (e && (e as Prisma.PrismaClientKnownRequestError).code === 'P2025') {
+                  await prisma.lesson.create({
+                    data: {
+                      moduleId: targetModuleId,
+                      title: lessonData.title,
+                      content: lessonData.content,
+                      duration: lessonData.duration,
+                      orderIndex: lessonData.orderIndex,
+                      isFreePreview: lessonData.isFreePreview,
+                      videoUrl: lessonData.videoUrl,
+                      presentationUrl: lessonData.presentationUrl,
+                      slides: lessonData.slides || [],
+                      contentType: lessonData.contentType,
+                    },
+                  })
+                  console.warn('Lesson not found, created instead:', lessonData.id)
+                } else {
+                  throw e
+                }
+              }
             } else {
-              // Create new lesson
               await prisma.lesson.create({
                 data: {
-                  moduleId: moduleData.id,
+                  moduleId: targetModuleId,
                   title: lessonData.title,
                   content: lessonData.content,
                   duration: lessonData.duration,
@@ -243,42 +262,103 @@ router.put("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
             }
           }
         } else {
-          // Create new module with lessons
-          await prisma.courseModule.create({
-            data: {
-              courseId,
-              title: moduleData.title,
-              orderIndex: moduleData.orderIndex,
-              lessons: {
-                create: moduleData.lessons.map((lesson) => ({
-                  title: lesson.title,
-                  content: lesson.content,
-                  duration: lesson.duration,
-                  orderIndex: lesson.orderIndex,
-                  isFreePreview: lesson.isFreePreview,
-                  videoUrl: lesson.videoUrl,
-                  presentationUrl: lesson.presentationUrl,
-                  slides: lesson.slides || [],
-                  contentType: lesson.contentType,
-                })),
-              },
-            },
-          })
+          // No module ID provided: try to match by orderIndex to avoid unique constraint collision
+          const existingModule = await prisma.courseModule.findFirst({ where: { courseId, orderIndex: moduleData.orderIndex } })
+          let targetModuleId: string
+          if (existingModule) {
+            await prisma.courseModule.update({
+              where: { id: existingModule.id },
+              data: { title: moduleData.title, orderIndex: moduleData.orderIndex },
+            })
+            targetModuleId = existingModule.id
+          } else {
+            const created = await prisma.courseModule.create({
+              data: { courseId, title: moduleData.title, orderIndex: moduleData.orderIndex },
+            })
+            targetModuleId = created.id
+          }
+
+          // Upsert lessons by id if provided, otherwise by orderIndex
+          for (const lesson of moduleData.lessons) {
+            if (lesson.id) {
+              try {
+                await prisma.lesson.update({
+                  where: { id: lesson.id },
+                  data: {
+                    title: lesson.title,
+                    content: lesson.content,
+                    duration: lesson.duration,
+                    orderIndex: lesson.orderIndex,
+                    isFreePreview: lesson.isFreePreview,
+                    videoUrl: lesson.videoUrl,
+                    presentationUrl: lesson.presentationUrl,
+                    slides: lesson.slides || [],
+                    contentType: lesson.contentType,
+                  },
+                })
+              } catch (e: any) {
+                if (e && (e as Prisma.PrismaClientKnownRequestError).code === 'P2025') {
+                  await prisma.lesson.create({
+                    data: {
+                      moduleId: targetModuleId,
+                      title: lesson.title,
+                      content: lesson.content,
+                      duration: lesson.duration,
+                      orderIndex: lesson.orderIndex,
+                      isFreePreview: lesson.isFreePreview,
+                      videoUrl: lesson.videoUrl,
+                      presentationUrl: lesson.presentationUrl,
+                      slides: lesson.slides || [],
+                      contentType: lesson.contentType,
+                    },
+                  })
+                } else {
+                  throw e
+                }
+              }
+            } else {
+              // Try to match existing lesson by orderIndex to avoid P2002 unique constraint
+              const existingLesson = await prisma.lesson.findFirst({ where: { moduleId: targetModuleId, orderIndex: lesson.orderIndex } })
+              if (existingLesson) {
+                await prisma.lesson.update({
+                  where: { id: existingLesson.id },
+                  data: {
+                    title: lesson.title,
+                    content: lesson.content,
+                    duration: lesson.duration,
+                    orderIndex: lesson.orderIndex,
+                    isFreePreview: lesson.isFreePreview,
+                    videoUrl: lesson.videoUrl,
+                    presentationUrl: lesson.presentationUrl,
+                    slides: lesson.slides || [],
+                    contentType: lesson.contentType,
+                  },
+                })
+              } else {
+                await prisma.lesson.create({
+                  data: {
+                    moduleId: targetModuleId,
+                    title: lesson.title,
+                    content: lesson.content,
+                    duration: lesson.duration,
+                    orderIndex: lesson.orderIndex,
+                    isFreePreview: lesson.isFreePreview,
+                    videoUrl: lesson.videoUrl,
+                    presentationUrl: lesson.presentationUrl,
+                    slides: lesson.slides || [],
+                    contentType: lesson.contentType,
+                  },
+                })
+              }
+            }
+          }
         }
       }
-      
-      // Return updated course
+
       const updatedCourse = await prisma.course.findUnique({
         where: { id: courseId },
-        include: {
-          modules: {
-            include: {
-              lessons: true,
-            },
-          },
-        },
+        include: { modules: { include: { lessons: true } } },
       })
-      
       return res.json(updatedCourse)
     } else {
       // Regular update - just basic course info

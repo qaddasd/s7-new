@@ -54,6 +54,19 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     close()
   }
 
+  React.useEffect(() => {
+    const el = typeof document !== 'undefined' ? (document.querySelector('.site-content') as HTMLElement | null) : null
+    if (!el) return
+    if (state.open) {
+      try { (document.activeElement as HTMLElement | null)?.blur() } catch {}
+      try { el.setAttribute('inert', '') } catch {}
+      try { el.style.pointerEvents = 'none'; el.style.userSelect = 'none' } catch {}
+    } else {
+      try { el.removeAttribute('inert') } catch {}
+      try { el.style.pointerEvents = ''; el.style.userSelect = '' } catch {}
+    }
+  }, [state.open])
+
   const preset = state.options.preset
   const presetDefaults: Record<string, Partial<ConfirmOptions>> = {
     logout: {
