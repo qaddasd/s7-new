@@ -17,6 +17,7 @@ const nextConfig = {
       { source: '/api/:path*', destination: `${target}/api/:path*` },
       { source: '/auth/:path*', destination: `${target}/auth/:path*` },
       { source: '/courses/:path*', destination: `${target}/courses/:path*` },
+      { source: '/bytesize/:path*', destination: `${target}/bytesize/:path*` },
       { source: '/uploads/:path*', destination: `${target}/uploads/:path*` },
       { source: '/media/:path*', destination: `${target}/media/:path*` },
     ]
