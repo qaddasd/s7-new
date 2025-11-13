@@ -88,6 +88,7 @@ export default function CourseLessonTab({
   const [lessonContent, setLessonContent] = useState<string>(lesson?.content || "")
   const [lessonQuiz, setLessonQuiz] = useState<Array<any>>([])
   const [loadingQuiz, setLoadingQuiz] = useState(false)
+  const [quizAccessDenied, setQuizAccessDenied] = useState(false)
 
   const allAnswered = Array.isArray(lessonQuiz) && lessonQuiz.length > 0 && lessonQuiz.every((q: any) => typeof q.selectedIndex === 'number')
   const correctCount = (lessonQuiz || []).filter((q: any) => q.isCorrect).length
@@ -197,10 +198,17 @@ export default function CourseLessonTab({
       .then((list) => {
         console.log('Questions received:', list)
         setLessonQuiz(list || [])
+        setQuizAccessDenied(false)
       })
       .catch((err) => {
         console.error('Failed to load questions:', err)
         setLessonQuiz([])
+        try {
+          const msg = String(err?.message || '')
+          const low = msg.toLowerCase()
+          if (low.includes('прав') || low.includes('доступ') || low.includes('no access')) setQuizAccessDenied(true)
+          else setQuizAccessDenied(false)
+        } catch { setQuizAccessDenied(false) }
       })
       .finally(() => setLoadingQuiz(false))
   }, [course?.id, moduleId, lessonId])
@@ -302,7 +310,7 @@ export default function CourseLessonTab({
               </div>
               <div className="bg-[#16161c] border border-[#2a2a35] rounded-2xl p-4 text-white space-y-3">
                 {loadingQuiz && <div className="text-white/60">Загрузка вопросов...</div>}
-                {!loadingQuiz && lessonQuiz.length === 0 && <div className="text-white/60">Вопросов пока нет</div>}
+                {!loadingQuiz && lessonQuiz.length === 0 && <div className="text-white/60">{quizAccessDenied ? 'Нет доступа к вопросам' : 'Вопросов пока нет'}</div>}
                 {!loadingQuiz && lessonQuiz.length > 0 && (
                   <div className="space-y-4">
                     {lessonQuiz.map((q) => (

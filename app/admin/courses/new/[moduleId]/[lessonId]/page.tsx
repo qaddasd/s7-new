@@ -215,6 +215,26 @@ export default function Page() {
       writeDraftBy(draftKey, course)
       toast({ title: "Сохранено", description: "Урок сохранён в черновик" } as any)
       await persistToServer()
+      try {
+        const cid = editId || (typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem("s7_admin_course_draft") || '{}') as any)?.courseId : '')
+        const text = (lesson?.quizQuestion || '').trim()
+        const opts = Array.isArray(lesson?.quizOptions) ? (lesson!.quizOptions as string[]).filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()) : []
+        const correctIndex = typeof lesson?.quizCorrectIndex === 'number' ? (lesson!.quizCorrectIndex as number) : -1
+        const xpReward = typeof lesson?.quizXp === 'number' ? (lesson!.quizXp as number) : 100
+        if (cid && text && opts.length >= 2 && correctIndex >= 0 && correctIndex < opts.length) {
+          try {
+            const courseData = await apiFetch<any>(`/api/admin/courses/${encodeURIComponent(cid)}`)
+            const modIdx = Number(moduleId)
+            const lesIdx = Number(lessonId)
+            const targetModule = (courseData.modules || []).find((m: any) => Number(m.orderIndex) === Number(modIdx - 1)) || (courseData.modules || [])[modIdx - 1]
+            const targetLesson = targetModule ? ((targetModule.lessons || []).find((l: any) => Number(l.orderIndex) === Number(lesIdx - 1)) || (targetModule.lessons || [])[lesIdx - 1]) : null
+            if (targetModule && targetLesson) {
+              await apiFetch(`/courses/${cid}/questions`, { method: 'POST', body: JSON.stringify({ text, options: opts, correctIndex, xpReward, moduleId: targetModule.id, lessonId: targetLesson.id }) })
+              toast({ title: 'Вопрос сохранен', description: 'Вопрос успешно добавлен к уроку' } as any)
+            }
+          } catch {}
+        }
+      } catch {}
       if (goBack) router.push(`/admin/courses/new/${moduleId}${qs}`)
     } catch {}
   }
