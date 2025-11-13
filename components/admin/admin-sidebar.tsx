@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Home, BookOpen, Users, GraduationCap, FileText, Wrench, CreditCard, Award, LogOut, Newspaper, Gamepad2 } from "lucide-react"
+import { Home, BookOpen, Users, GraduationCap, FileText, Wrench, CreditCard, Award, LogOut, Newspaper, Gamepad2, CheckCircle } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-context"
 import ProfileDropdown from "@/components/kokonutui/profile-dropdown"
 import { useConfirm } from "@/components/ui/confirm"
@@ -18,6 +18,7 @@ export default function AdminSidebar({ open, onClose }: { open: boolean; onClose
     { href: "/admin/games", label: "Игры", icon: Gamepad2 },
     { href: "/admin/programs", label: "Программы", icon: FileText },
     { href: "/admin/clubs", label: "Кружки", icon: GraduationCap },
+    { href: "/admin/subscriptions", label: "Подписки", icon: CheckCircle },
     { href: "/admin/users", label: "Пользователи", icon: Users },
     { href: "/admin/payments", label: "Платежи", icon: CreditCard },
     { href: "/admin/teams", label: "Команды", icon: Users },

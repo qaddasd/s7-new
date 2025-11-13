@@ -141,9 +141,27 @@ export default function Page() {
       
       setLastSaved(new Date())
       console.log("Lesson saved")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving lesson:", error)
-      toast({ title: "Ошибка", description: "Не удалось сохранить урок", variant: "destructive" })
+      
+      // Check if it's a structured validation error
+      if (error.fields) {
+        // Show field-level errors
+        const fieldErrors = Object.entries(error.fields)
+          .map(([field, errors]) => `${field}: ${(errors as string[]).join(', ')}`)
+          .join('; ')
+        toast({ 
+          title: "Ошибка валидации", 
+          description: fieldErrors || error.message, 
+          variant: "destructive" 
+        })
+      } else {
+        toast({ 
+          title: "Ошибка", 
+          description: error.message || "Не удалось сохранить урок", 
+          variant: "destructive" 
+        })
+      }
     } finally {
       setSaving(false)
     }
@@ -192,11 +210,12 @@ export default function Page() {
     if (!lesson || !lesson.quizOptions || lesson.quizOptions.length <= 2) return
     const newOptions = lesson.quizOptions.filter((_, i) => i !== index)
     // Adjust correct index if necessary
-    let newCorrectIndex = lesson.quizCorrectIndex
-    if (lesson.quizCorrectIndex === index) {
+    const currentCorrectIndex = lesson.quizCorrectIndex ?? -1
+    let newCorrectIndex = currentCorrectIndex
+    if (currentCorrectIndex === index) {
       newCorrectIndex = -1
-    } else if (lesson.quizCorrectIndex > index) {
-      newCorrectIndex = lesson.quizCorrectIndex - 1
+    } else if (currentCorrectIndex > index) {
+      newCorrectIndex = currentCorrectIndex - 1
     }
     updateLesson({ quizOptions: newOptions, quizCorrectIndex: newCorrectIndex })
   }

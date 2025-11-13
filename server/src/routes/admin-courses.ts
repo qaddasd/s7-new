@@ -384,7 +384,8 @@ router.put("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
 })
 
 // Create or update course basic info
-router.post("/courses/:courseId/basic", async (req: AuthenticatedRequest, res: Response) => {
+// Note: This route handles both /courses/:courseId/basic AND /:courseId/basic for backward compatibility
+const handleCourseBasicInfo = async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params
   const schema = z.object({
     title: z.string().min(1),
@@ -396,7 +397,20 @@ router.post("/courses/:courseId/basic", async (req: AuthenticatedRequest, res: R
   })
   
   const parsed = schema.safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  if (!parsed.success) {
+    // Format validation errors for better frontend display
+    const fieldErrors: Record<string, string[]> = {}
+    if (parsed.error.formErrors.fieldErrors) {
+      Object.entries(parsed.error.formErrors.fieldErrors).forEach(([field, errors]) => {
+        fieldErrors[field] = errors || []
+      })
+    }
+    return res.status(400).json({ 
+      error: "Validation failed", 
+      code: "VALIDATION_ERROR",
+      fields: fieldErrors 
+    })
+  }
   
   const data = parsed.data
   
@@ -431,11 +445,18 @@ router.post("/courses/:courseId/basic", async (req: AuthenticatedRequest, res: R
       })
       return res.json(course)
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error saving course basic info:", error)
-    return res.status(500).json({ error: "Failed to save course basic info" })
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: "Course not found", code: "COURSE_NOT_FOUND" })
+    }
+    return res.status(500).json({ error: "Failed to save course basic info", code: "SERVER_ERROR" })
   }
-})
+}
+
+// Register both route patterns for backward compatibility
+router.post("/:courseId/basic", handleCourseBasicInfo)
+router.post("/courses/:courseId/basic", handleCourseBasicInfo)
 
 // Create or update module
 router.post("/courses/:courseId/modules", async (req: AuthenticatedRequest, res: Response) => {
@@ -573,7 +594,21 @@ router.post("/modules/:moduleId/lessons", async (req: AuthenticatedRequest, res:
 router.put("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Response) => {
   const { lessonId } = req.params
   const parsed = lessonSchema.partial().safeParse(req.body)
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  if (!parsed.success) {
+    // Format validation errors for better frontend display
+    const fieldErrors: Record<string, string[]> = {}
+    if (parsed.error.formErrors.fieldErrors) {
+      Object.entries(parsed.error.formErrors.fieldErrors).forEach(([field, errors]) => {
+        fieldErrors[field] = errors || []
+      })
+    }
+    return res.status(400).json({ 
+      error: "Validation failed", 
+      code: "VALIDATION_ERROR",
+      fields: fieldErrors,
+      message: Object.values(fieldErrors).flat().join(', ') || "Invalid lesson data"
+    })
+  }
   
   const data = parsed.data
   

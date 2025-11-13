@@ -1,10 +1,11 @@
 "use client"
 import { useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api"
-import { Plus, Calendar, MapPin, Users, Check, X, Clock, Building2, ArrowUpRight, Trash2 } from "lucide-react"
+import { Plus, Calendar, MapPin, Users, Check, X, Clock, Building2, ArrowUpRight, Trash2, Download, FileText } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { useConfirm } from "@/components/ui/confirm"
 import { useAuth } from "@/components/auth/auth-context"
+import { exportAttendanceToCSV, exportAttendanceToPDF } from "@/lib/export-utils"
 
 type Club = {
   id: string
@@ -82,6 +83,8 @@ export default function ClubsTab() {
   const [submissionsBySession, setSubmissionsBySession] = useState<Record<string, Array<{ id: string; score: number; student: { id: string; fullName?: string; email: string } }>>>({})
   const [programTemplates, setProgramTemplates] = useState<Record<string, Array<{ id: string; title: string; presentationUrl?: string; scriptUrl?: string }>>>({})
   const [lessonModal, setLessonModal] = useState<{ open: boolean; classId?: string; sessionId?: string; clubId?: string }>({ open: false })
+  const [upgradeModal, setUpgradeModal] = useState(false)
+  const [limitError, setLimitError] = useState<{ type: 'class' | 'student'; clubId?: string } | null>(null)
 
   // Close modals on Escape
   useEffect(() => {
@@ -92,12 +95,13 @@ export default function ClubsTab() {
       if (joinOpen) setJoinOpen(false)
       if (subOpen) setSubOpen(false)
       if (wizardOpen) setWizardOpen(false)
+      if (upgradeModal) setUpgradeModal(false)
     }
-    if (quizOpen || submissionsOpen || joinOpen || subOpen || wizardOpen) {
+    if (quizOpen || submissionsOpen || joinOpen || subOpen || wizardOpen || upgradeModal) {
       window.addEventListener('keydown', onKey)
       return () => window.removeEventListener('keydown', onKey)
     }
-  }, [quizOpen, submissionsOpen, joinOpen, subOpen, wizardOpen])
+  }, [quizOpen, submissionsOpen, joinOpen, subOpen, wizardOpen, upgradeModal])
 
   const load = async () => {
     setLoading(true)
@@ -233,7 +237,13 @@ export default function ClubsTab() {
   const submitSubscriptionRequest = async () => {
     try {
       setSubmittingOpenRequest(true)
-      await apiFetch(`/api/clubs/subscription-requests`, { method: 'POST', body: JSON.stringify({ amount: 2000, currency: 'KZT', period: 'month', method: 'kaspi', note: paymentComment }) })
+      await apiFetch(`/api/subscriptions/request`, { 
+        method: 'POST', 
+        body: JSON.stringify({ 
+          type: 'ONETIME_PURCHASE',
+          paymentComment 
+        }) 
+      })
       setOpenRequestSent(true)
       toast({ title: 'Заявка отправлена', description: 'Админы уведомлены. После проверки платежа доступ будет активирован.' } as any)
       // After successful request, proceed to registration wizard
@@ -944,7 +954,64 @@ export default function ClubsTab() {
                         </div>
 
                         <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 space-y-2">
-                          <div className="text-sm font-medium">Таблица посещаемости</div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-sm font-medium">Таблица посещаемости</div>
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => {
+                                  try {
+                                    const colDates = Array.from(new Set(classSessions.map(s => new Date(s.date).toISOString().slice(0,10))))
+                                    const dateToSession: Record<string, string> = {}
+                                    for (const s of classSessions) {
+                                      const iso = new Date(s.date).toISOString().slice(0,10)
+                                      dateToSession[iso] = s.id
+                                    }
+                                    const students = enrolled.map(u => ({ id: u.id, name: u.fullName || u.email }))
+                                    const attendanceData: Record<string, Record<string, { status: string }>> = {}
+                                    colDates.forEach(d => {
+                                      const sid = dateToSession[d]
+                                      const key = `${cl.id}:${sid}`
+                                      attendanceData[d] = attendanceDraft[key] || {}
+                                    })
+                                    exportAttendanceToCSV(students, colDates, attendanceData, cl.title)
+                                    toast({ title: 'Экспортировано', description: 'Таблица сохранена в CSV' })
+                                  } catch (e: any) {
+                                    toast({ title: 'Ошибка', description: e?.message || 'Не удалось экспортировать', variant: 'destructive' as any })
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1"
+                              >
+                                <Download className="w-3 h-3" />
+                                CSV
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  try {
+                                    const colDates = Array.from(new Set(classSessions.map(s => new Date(s.date).toISOString().slice(0,10))))
+                                    const dateToSession: Record<string, string> = {}
+                                    for (const s of classSessions) {
+                                      const iso = new Date(s.date).toISOString().slice(0,10)
+                                      dateToSession[iso] = s.id
+                                    }
+                                    const students = enrolled.map(u => ({ id: u.id, name: u.fullName || u.email }))
+                                    const attendanceData: Record<string, Record<string, { status: string }>> = {}
+                                    colDates.forEach(d => {
+                                      const sid = dateToSession[d]
+                                      const key = `${cl.id}:${sid}`
+                                      attendanceData[d] = attendanceDraft[key] || {}
+                                    })
+                                    exportAttendanceToPDF(students, colDates, attendanceData, cl.title)
+                                  } catch (e: any) {
+                                    toast({ title: 'Ошибка', description: e?.message || 'Не удалось экспортировать', variant: 'destructive' as any })
+                                  }
+                                }}
+                                className="inline-flex items-center gap-1 text-xs rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-1"
+                              >
+                                <FileText className="w-3 h-3" />
+                                PDF
+                              </button>
+                            </div>
+                          </div>
                           {(() => {
                             const colDates = Array.from(new Set(classSessions.map(s => new Date(s.date).toISOString().slice(0,10))))
                             const dateToSession: Record<string, string> = {}
@@ -1042,9 +1109,9 @@ export default function ClubsTab() {
             <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3">
               <div className="text-sm font-medium mb-2">Создать класс</div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm items-center">
-                <input placeholder="Название" value={(newClass[c.id]?.title)||""} onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), title: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                <input placeholder="Локация (опц.)" value={(newClass[c.id]?.location)||""} onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), location: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
-                <input placeholder="Описание (опц.)" value={(newClass[c.id]?.description)||""} onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), description: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
+                <input placeholder="Название" value={(newClass[c.id]?.title)||""}  onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), title: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
+                <input placeholder="Локация (опц.)" value={(newClass[c.id]?.location)||""}  onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), location: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
+                <input placeholder="Описание (опц.)" value={(newClass[c.id]?.description)||""}  onChange={(e)=>setNewClass(prev=>({ ...prev, [c.id]: { ...(prev[c.id]||{ title:"" }), description: e.target.value } }))} className="bg-[#0c0c10] border border-[#2a2a35] rounded-lg px-2 py-2" />
                 <button onClick={async()=>{
                   const payload = newClass[c.id]
                   if (!payload?.title?.trim()) return
@@ -1054,7 +1121,13 @@ export default function ClubsTab() {
                     await load()
                     toast({ title: 'Класс создан' } as any)
                   } catch(e:any) {
-                    toast({ title: 'Ошибка', description: e?.message || 'Не удалось создать класс', variant: 'destructive' as any })
+                    // Check if it's a limit error
+                    if (e?.message?.includes('лимит') || e?.message?.includes('максимум')) {
+                      setLimitError({ type: 'class', clubId: c.id })
+                      setUpgradeModal(true)
+                    } else {
+                      toast({ title: 'Ошибка', description: e?.message || 'Не удалось создать класс', variant: 'destructive' as any })
+                    }
                   }
                 }} className="rounded-full bg-[#2a2a35] hover:bg-[#333344] px-3 py-2">Создать</button>
               </div>
@@ -1064,6 +1137,43 @@ export default function ClubsTab() {
           </div>
         ))}
       </section>
+
+      {/* Upgrade subscription modal */}
+      {upgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={()=>{ setUpgradeModal(false); setLimitError(null) }}>
+          <div className="w-full max-w-md rounded-2xl bg-[#16161c] border border-[#2a2a35] p-5 text-white" onClick={(e)=>e.stopPropagation()}>
+            <div className="text-lg font-semibold mb-3">
+              {limitError?.type === 'class' ? 'Достигнут лимит классов' : 'Достигнут лимит учеников'}
+            </div>
+            <div className="space-y-3 text-white/80 text-sm mb-4">
+              {limitError?.type === 'class' ? (
+                <>
+                  <div>Ваша текущая подписка позволяет создать максимум <strong>2 класса</strong> на кружок.</div>
+                  <div>Для создания дополнительных классов необходимо обновить подписку.</div>
+                </>
+              ) : (
+                <>
+                  <div>Ваша текущая подписка позволяет добавить максимум <strong>30 учеников</strong> в класс.</div>
+                  <div>Для добавления большего количества учеников необходимо обновить подписку.</div>
+                </>
+              )}
+            </div>
+            <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-3 mb-4">
+              <div className="text-sm font-medium mb-2">Улучшенная подписка</div>
+              <div className="text-white/70 text-xs space-y-1">
+                <div>• До 5 классов на кружок</div>
+                <div>• До 100 учеников в классе</div>
+                <div>• Приоритетная поддержка</div>
+                <div className="text-[#00a3ff] font-medium mt-2">5000₸/месяц</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={()=>{ setUpgradeModal(false); setLimitError(null) }} className="px-4 py-2 rounded-full bg-[#1b1b22] border border-[#2a2a35] text-white/90">Закрыть</button>
+              <button onClick={()=>{ setUpgradeModal(false); setLimitError(null); setSubOpen(true) }} className="px-4 py-2 rounded-full bg-[#00a3ff] hover:bg-[#0088cc] text-black font-medium">Обновить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

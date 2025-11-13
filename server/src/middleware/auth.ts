@@ -1,15 +1,22 @@
 import { NextFunction, Response } from "express"
 import { verifyToken } from "../utils/jwt"
 import type { AuthenticatedRequest } from "../types"
+import { prisma } from "../db"
 
-export function protect(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function protect(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const header = req.get("authorization") || ""
   const token = header.startsWith("Bearer ") ? header.slice(7) : null
   if (!token) return res.status(401).json({ error: "Unauthorized" })
 
   try {
     const payload = verifyToken(token)
-    req.user = { id: payload.sub, role: payload.role }
+    // Fetch user details for fullName and email
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, role: true, fullName: true, email: true },
+    })
+    if (!user) return res.status(401).json({ error: "User not found" })
+    req.user = { id: user.id, role: user.role, fullName: user.fullName, email: user.email }
     return next()
   } catch (error) {
     return res.status(401).json({ error: "Invalid token" })

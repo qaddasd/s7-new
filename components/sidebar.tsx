@@ -2,7 +2,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { Home, BookOpen, User, Users, GraduationCap, FileText, Wrench, ChevronLeft, ChevronRight, LogOut, Shield, Calendar } from "lucide-react"
+import { Home, BookOpen, User, Users, GraduationCap, FileText, Wrench, ChevronLeft, ChevronRight, LogOut, Shield, Calendar, CalendarDays } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-context"
 import { useConfirm } from "@/components/ui/confirm"
 import { useRouter } from "next/navigation"
@@ -53,6 +53,7 @@ export default function Sidebar({
     { id: "home", label: "Главная", icon: Home, href: "/dashboard?tab=home" },
     { id: "courses", label: "Курсы", icon: BookOpen, href: "/dashboard?tab=courses" },
     { id: "clubs", label: "Кружки", icon: Calendar, href: "/dashboard?tab=clubs" },
+    { id: "schedule", label: "Расписание", icon: CalendarDays, href: "/schedule" },
     { id: "s7-tools", label: "S7 Tools", icon: Wrench, href: "/dashboard?tab=s7-tools" },
     { id: "teams", label: "Команда", icon: Users, href: "/dashboard?tab=teams" },
     { id: "profile", label: "Профиль", icon: User, href: "/dashboard?tab=profile" },

@@ -136,49 +136,66 @@ export async function apiFetch<T = any>(path: string, init: RequestInit = {}): P
     }
   }
   
-  // Добавляем более детальную обработку ошибок с понятными сообщениями для пользователя
+  // Enhanced error handling with structured error format support
   if (!res.ok) {
     const text = await res.text().catch(() => "")
+    let errorData: any = null
     let msg = text
+    
     try {
-      const j = JSON.parse(text)
-      msg = j.error || j.message || j.reason || text
-    } catch {
-      // Если не JSON, используем текст ошибки
+      errorData = JSON.parse(text)
+      // Check if it's a structured error with fields
+      if (errorData.fields || errorData.code) {
+        // Preserve the full error object for frontend handling
+        const error: any = new Error(errorData.message || errorData.error || `HTTP ${res.status}`)
+        error.fields = errorData.fields
+        error.code = errorData.code
+        error.status = res.status
+        throw error
+      }
+      msg = errorData.error || errorData.message || errorData.reason || text
+    } catch (parseError) {
+      // If parsing failed but it's the structured error we created above, rethrow it
+      if (parseError instanceof Error && (parseError as any).fields) {
+        throw parseError
+      }
+      // Otherwise use the text as message
       msg = text || `HTTP ${res.status}: ${res.statusText}`
     }
     
-    // Для ошибок 5xx добавляем более понятное сообщение
+    // For errors 5xx add user-friendly message
     if (res.status >= 500) {
       msg = "Сервер временно недоступен. Пожалуйста, попробуйте позже."
     }
     
-    // Для ошибок 404 добавляем понятное сообщение
+    // For 404 errors
     if (res.status === 404) {
       msg = "Запрашиваемый ресурс не найден."
     }
     
-    // Для ошибок 403 добавляем понятное сообщение
+    // For 403 errors
     if (res.status === 403) {
       msg = "У вас недостаточно прав для выполнения этого действия."
     }
     
-    // Для ошибок 401 добавляем понятное сообщение
+    // For 401 errors
     if (res.status === 401) {
       msg = "Ваша сессия истекла. Пожалуйста, войдите в систему снова."
     }
     
-    // Для ошибок 400 добавляем понятное сообщение
-    if (res.status === 400) {
-      msg = msg || "Некорректные данные. Проверьте введённую информацию."
+    // For 400 errors - keep original message if present
+    if (res.status === 400 && !msg) {
+      msg = "Некорректные данные. Проверьте введённую информацию."
     }
     
-    // Для ошибок сети
+    // For network errors
     if (res.status === 0) {
       msg = "Проблемы с подключением к серверу. Проверьте ваше интернет-соединение."
     }
     
-    throw new Error(msg || `Ошибка сервера (${res.status})`)
+    const error: any = new Error(msg || `Ошибка сервера (${res.status})`)
+    error.status = res.status
+    throw error
   }
   return (await res.json()) as T
 }

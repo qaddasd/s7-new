@@ -119,6 +119,13 @@ model User {
   dailyMissionProgress    DailyMissionProgress[]
   // Opposite side for ClubQuizSubmission.student
   clubQuizSubmissions     ClubQuizSubmission[]
+  // New enhanced kruzhok relations
+  subscriptions           Subscription[]
+  confirmedSubscriptions  Subscription[]        @relation("SubscriptionConfirmer")
+  classesCreated          ClubClass[]           @relation("ClassCreator")
+  schedulesCreated        Schedule[]            @relation("ScheduleCreator")
+  certificateRequests     CertificateRequest[]  @relation("CertificateRequester")
+  reviewedCertificates    CertificateRequest[]  @relation("CertificateReviewer")
 }
 
 model Session {
@@ -702,6 +709,10 @@ model Kruzhok {
   // Opposite relations for attendance module
   extraStudents KruzhokExtraStudent[]
   sessions      KruzhokSession[]
+  // Enhanced kruzhok system relations
+  classes           ClubClass[]
+  schedules         Schedule[]
+  certificateRequests CertificateRequest[]
 }
 
 model KruzhokProgram {
@@ -729,6 +740,8 @@ model KruzhokLessonTemplate {
   quizJson    Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  schedules   Schedule[]
 }
 
 model KruzhokLesson {
@@ -810,4 +823,149 @@ model KruzhokAttendance {
   markedAt       DateTime @default(now())
 
   @@unique([sessionId, extraStudentId])
+}
+
+// --- Enhanced Kruzhok System Models ---
+
+enum SubscriptionType {
+  MONTHLY_SUBSCRIPTION
+  ONETIME_PURCHASE
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  REJECTED
+}
+
+model Subscription {
+  id                    String              @id @default(cuid())
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String
+  type                  SubscriptionType    @default(ONETIME_PURCHASE)
+  status                SubscriptionStatus  @default(PENDING)
+  amount                Decimal             @default(2000)
+  currency              String              @default("KZT")
+  paymentMethod         String              @default("KASPI")
+  paymentComment        String              @unique
+  maxKruzhoks           Int                 @default(1)
+  maxClassesPerKruzhok  Int                 @default(2)
+  maxStudentsPerClass   Int                 @default(30)
+  requestedAt           DateTime            @default(now())
+  confirmedAt           DateTime?
+  confirmedBy           User?               @relation("SubscriptionConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+  confirmedById         String?
+  expiresAt             DateTime?
+  adminNotes            String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([userId, status])
+}
+
+model ClubClass {
+  id          String   @id @default(cuid())
+  kruzhok     Kruzhok  @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  kruzhokId   String
+  name        String
+  description String?
+  maxStudents Int      @default(30)
+  orderIndex  Int
+  isActive    Boolean  @default(true)
+  createdBy   User     @relation("ClassCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  schedules   Schedule[]
+
+  @@unique([kruzhokId, orderIndex])
+  @@index([kruzhokId, isActive])
+}
+
+enum ScheduleStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Schedule {
+  id                String          @id @default(cuid())
+  kruzhok           Kruzhok         @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  kruzhokId         String
+  class             ClubClass?      @relation(fields: [classId], references: [id], onDelete: SetNull)
+  classId           String?
+  lessonTemplate    KruzhokLessonTemplate? @relation(fields: [lessonTemplateId], references: [id], onDelete: SetNull)
+  lessonTemplateId  String?
+  title             String
+  scheduledDate     DateTime
+  scheduledTime     String
+  durationMinutes   Int             @default(60)
+  status            ScheduleStatus  @default(SCHEDULED)
+  completedAt       DateTime?
+  createdBy         User            @relation("ScheduleCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdById       String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  attendances       Attendance[]
+
+  @@index([kruzhokId, scheduledDate])
+  @@index([scheduledDate, status])
+  @@index([createdById])
+}
+
+enum AttendanceStatusNew {
+  PRESENT
+  LATE
+  ABSENT
+}
+
+model Attendance {
+  id          String              @id @default(cuid())
+  schedule    Schedule            @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId  String
+  student     User                @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  studentId   String
+  status      AttendanceStatusNew @default(PRESENT)
+  notes       String?
+  markedAt    DateTime            @default(now())
+  markedBy    User                @relation("AttendanceMarker", fields: [markedById], references: [id], onDelete: Restrict)
+  markedById  String
+
+  @@unique([scheduleId, studentId])
+  @@index([studentId, markedAt])
+}
+
+enum CertificateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SENT
+}
+
+model CertificateRequest {
+  id               String             @id @default(cuid())
+  user             User               @relation("CertificateRequester", fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  kruzhok          Kruzhok            @relation(fields: [kruzhokId], references: [id], onDelete: Cascade)
+  kruzhokId        String
+  totalXP          Int
+  thresholdXP      Int                @default(100)
+  taskDescription  String
+  status           CertificateStatus  @default(PENDING)
+  requestedAt      DateTime           @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       User?              @relation("CertificateReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedById     String?
+  sentAt           DateTime?
+  certificateUrl   String?
+  adminNotes       String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([userId, kruzhokId])
+  @@index([status, requestedAt])
 }

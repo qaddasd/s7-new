@@ -24,6 +24,8 @@ import { router as kruzhokLessonsRouter } from "./routes/kruzhok-lessons"
 import { router as kruzhokMatchingRouter } from "./routes/kruzhok-matching"
 import { router as kruzhokQuizRouter } from "./routes/kruzhok-quiz"
 import { router as kruzhokOldRouter } from "./routes/kruzhok-old"
+import { router as subscriptionsRouter } from "./routes/subscriptions"
+import { router as certificatesRouter } from "./routes/certificates"
 import { ensureDir } from "./utils/fs"
 
 const app = express()
@@ -100,6 +102,8 @@ app.use("/api/kruzhok-lessons", kruzhokLessonsRouter)
 app.use("/api/kruzhok-matching", kruzhokMatchingRouter)
 app.use("/api/kruzhok-quiz", kruzhokQuizRouter)
 app.use("/api/kruzhok-old", kruzhokOldRouter)
+app.use("/api/subscriptions", subscriptionsRouter)
+app.use("/api/certificates", certificatesRouter)
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err)
