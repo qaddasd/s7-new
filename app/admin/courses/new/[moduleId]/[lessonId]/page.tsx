@@ -223,13 +223,13 @@ export default function Page() {
         const xpReward = typeof lesson?.quizXp === 'number' ? (lesson!.quizXp as number) : 100
         if (cid && text && opts.length >= 2 && correctIndex >= 0 && correctIndex < opts.length) {
           try {
-            const courseData = await apiFetch<any>(`/api/admin/courses/${encodeURIComponent(cid)}`)
+            const courseData = await apiFetch<any>(`/api/admin-courses/${encodeURIComponent(cid)}`)
             const modIdx = Number(moduleId)
             const lesIdx = Number(lessonId)
             const targetModule = (courseData.modules || []).find((m: any) => Number(m.orderIndex) === Number(modIdx - 1)) || (courseData.modules || [])[modIdx - 1]
             const targetLesson = targetModule ? ((targetModule.lessons || []).find((l: any) => Number(l.orderIndex) === Number(lesIdx - 1)) || (targetModule.lessons || [])[lesIdx - 1]) : null
             if (targetModule && targetLesson) {
-              await apiFetch(`/courses/${cid}/questions`, { method: 'POST', body: JSON.stringify({ text, options: opts, correctIndex, xpReward, moduleId: targetModule.id, lessonId: targetLesson.id }) })
+              await apiFetch(`/api/admin-courses/lessons/${targetLesson.id}/questions`, { method: 'POST', body: JSON.stringify({ text, options: opts, correctIndex, xpReward, moduleId: targetModule.id, lessonId: targetLesson.id }) })
               toast({ title: 'Вопрос сохранен', description: 'Вопрос успешно добавлен к уроку' } as any)
             }
           } catch {}
@@ -351,9 +351,9 @@ export default function Page() {
       const raw = readDraftBy(draftKey)
       if (!raw) return
       const payload = buildPayload(raw)
-      if (editId) await apiFetch(`/api/admin/courses/${encodeURIComponent(editId)}?sync=ids`, { method: 'PUT', body: JSON.stringify(payload) })
+      if (editId) await apiFetch(`/api/admin-courses/${encodeURIComponent(editId)}?sync=ids`, { method: 'PUT', body: JSON.stringify(payload) })
       else {
-        const created = await apiFetch<any>(`/api/admin/courses`, { method: 'POST', body: JSON.stringify(payload) })
+        const created = await apiFetch<any>(`/api/admin-courses`, { method: 'POST', body: JSON.stringify(payload) })
         if (created?.id) {
           const qs2 = new URLSearchParams(search.toString())
           qs2.set('edit', created.id)

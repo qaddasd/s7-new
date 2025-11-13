@@ -18,20 +18,26 @@ import {
   CheckCircle,
   QrCode,
   MessageCircle,
+  Image,
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 
 interface Lesson {
   id: string
   title: string
-  lessonTemplate: {
+  content?: string // For ReactMarkdown
+  duration?: string | null
+  videoUrl?: string | null
+  presentationUrl?: string | null
+  slides?: Array<{ url: string }>
+  contentType?: string
+  lessonTemplate?: {
     mediaType: string
     contentUrl: string | null
     scenarioText: string | null
     quizId: string | null
   }
   isMentor: boolean // To show the 'End Lesson' button
-  content?: string // For ReactMarkdown
   showAccessCode?: boolean // For access code
   kruzhok?: { accessCode?: string } // For access code
   quizzes?: any[] // For QuizPlayer
@@ -51,6 +57,7 @@ export default function LessonViewPage() {
   const [activeGameIndex, setActiveGameIndex] = useState<number | null>(null)
   const [quizResults, setQuizResults] = useState<Map<string, any>>(new Map())
   const [gameResults, setGameResults] = useState<Map<string, any>>(new Map())
+  const [questions, setQuestions] = useState<any[]>([])
 
   const now = new Date()
   const ruDate = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "long", year: "numeric" }).format(now)
@@ -62,10 +69,34 @@ export default function LessonViewPage() {
   const fetchLesson = async () => {
     try {
       setLoading(true)
-      const data = await apiFetch<Lesson>(`/api/kruzhok/${kruzhokId}/lessons/${lessonId}`)
-      setLesson(data)
+      // Try to fetch as a course lesson first
+      const courseId = kruzhokId // Assuming the kruzhokId might be a courseId
+      const response = await apiFetch<any>(`/api/courses/${courseId}/lessons/${lessonId}`)
+      
+      if (response && response.lesson) {
+        // It's a course lesson
+        console.log('Course lesson data received:', response)
+        const lessonData = {
+          ...response.lesson,
+          quizzes: response.questions || [],
+          lessonTemplate: {
+            mediaType: response.lesson.videoUrl ? 'video' : response.lesson.presentationUrl ? 'presentation' : 'text',
+            contentUrl: response.lesson.videoUrl || response.lesson.presentationUrl,
+            scenarioText: null,
+            quizId: response.questions && response.questions.length > 0 ? 'course-quiz' : null
+          }
+        }
+        setLesson(lessonData)
+        setQuestions(response.questions || [])
+      } else {
+        // Fallback to kruzhok lesson
+        const data = await apiFetch<Lesson>(`/api/kruzhok/${kruzhokId}/lessons/${lessonId}`)
+        console.log('Kruzhok lesson data received:', data)
+        setLesson(data)
+        setQuestions(data.quizzes || [])
+      }
     } catch (error) {
-      console.error(error)
+      console.error('Error fetching lesson:', error)
       toast({
         title: "Қате",
         description: "Сабақты жүктеу мүмкін болмады",
@@ -283,13 +314,80 @@ export default function LessonViewPage() {
         </TabsList>
 
         <TabsContent value="content" className="space-y-6">
-          {/* Медиа материал */}
-          {lesson.lessonTemplate.contentUrl && (
+          {/* Видео */}
+          {lesson.videoUrl && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="w-5 h-5" />
+                  Видео
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-video">
+                  <iframe
+                    src={getEmbedUrl(lesson.videoUrl)}
+                    className="w-full h-full rounded-lg"
+                    allowFullScreen
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Презентация */}
+          {lesson.presentationUrl && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Presentation className="w-5 h-5" />
+                  Презентация
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-video">
+                  <iframe
+                    src={getEmbedUrl(lesson.presentationUrl)}
+                    className="w-full h-full rounded-lg"
+                    allowFullScreen
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Слайды */}
+          {lesson.slides && lesson.slides.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="w-5 h-5" />
+                  Слайды
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {lesson.slides.map((slide, index) => (
+                    <div key={index} className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <img 
+                        src={slide.url} 
+                        alt={`Слайд ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Старый шаблон контента (если есть) */}
+          {lesson.lessonTemplate?.contentUrl && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   {lesson.lessonTemplate.mediaType === "video" ? <Video className="w-5 h-5" /> : <Presentation className="w-5 h-5" />}
-                  {lesson.lessonTemplate.mediaType === "video" ? "Видео" : "Презентация"}
+                  {lesson.lessonTemplate.mediaType === "video" ? "Видео (шаблон)" : "Презентация (шаблон)"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -304,18 +402,35 @@ export default function LessonViewPage() {
             </Card>
           )}
 
-          {/* Ресурс/Текст */}
-          {lesson.lessonTemplate.mediaType === "resource" && (
+          {/* Контент урока */}
+          {lesson.content && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
-                  Материал
+                  Контент урока
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-lg max-w-none">
-                  <ReactMarkdown>{lesson.content || "Қосымша материал жоқ"}</ReactMarkdown>
+                  <ReactMarkdown>{lesson.content}</ReactMarkdown>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Старый шаблон текста (если есть) */}
+          {lesson.lessonTemplate?.scenarioText && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Сценарий / Әдістеме
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-lg max-w-none text-white/80">
+                  <ReactMarkdown>{lesson.lessonTemplate.scenarioText}</ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
@@ -323,7 +438,22 @@ export default function LessonViewPage() {
         </TabsContent>
 
         <TabsContent value="quizzes" className="space-y-4">
-          {lesson.lessonTemplate.quizId && (
+          {questions.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle>Квиз</CardTitle>
+                    <p className="text-gray-600 mt-2">Сабақ бойынша білімді тексеруге арналған квиз.</p>
+                    <p className="text-sm text-gray-500 mt-1">{questions.length} сұрақ</p>
+                  </div>
+                  <Button onClick={() => setActiveQuizIndex(0)}>
+                    Бастау
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          ) : lesson.lessonTemplate?.quizId && (
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">

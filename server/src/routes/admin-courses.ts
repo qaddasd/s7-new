@@ -72,6 +72,237 @@ const moduleSchema = z.object({
   lessons: z.array(lessonSchema).default([]),
 })
 
+// Schema for full course creation with modules and lessons
+const fullCourseSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  difficulty: z.string().min(1),
+  price: z.number().nonnegative().default(0),
+  isFree: z.boolean().default(true),
+  isPublished: z.boolean().default(false),
+  modules: z.array(z.object({
+    id: z.string().optional(), // Optional for existing modules
+    title: z.string().min(1),
+    orderIndex: z.number().int().min(0),
+    lessons: z.array(z.object({
+      id: z.string().optional(), // Optional for existing lessons
+      title: z.string().min(1),
+      content: z.string().optional(),
+      duration: z.string().optional(),
+      orderIndex: z.number().int().min(0),
+      isFreePreview: z.boolean().optional().default(false),
+      videoUrl: z.string().optional(),
+      presentationUrl: z.string().optional(),
+      slides: z.array(z.object({ url: z.string() })).optional(),
+      contentType: z.string().default("text"),
+    })).default([]),
+  })).default([]),
+})
+
+// Create course with full structure (modules and lessons)
+router.post("/", async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = fullCourseSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  
+  const data = parsed.data
+  
+  try {
+    // Create course with modules and lessons in a transaction
+    const course = await prisma.course.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        difficulty: data.difficulty,
+        authorId: req.user!.id,
+        price: data.price,
+        isFree: data.isFree,
+        isPublished: data.isPublished,
+        totalModules: data.modules.length,
+        modules: {
+          create: data.modules.map((module) => ({
+            title: module.title,
+            description: module.title,
+            orderIndex: module.orderIndex,
+            lessons: {
+              create: module.lessons.map((lesson) => ({
+                title: lesson.title,
+                content: lesson.content,
+                duration: lesson.duration,
+                orderIndex: lesson.orderIndex,
+                isFreePreview: lesson.isFreePreview,
+                videoUrl: lesson.videoUrl,
+                presentationUrl: lesson.presentationUrl,
+                slides: lesson.slides || [],
+                contentType: lesson.contentType,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        modules: {
+          include: {
+            lessons: true,
+          },
+        },
+      },
+    })
+    
+    return res.status(201).json(course)
+  } catch (error) {
+    console.error("Error creating course:", error)
+    return res.status(500).json({ error: "Failed to create course" })
+  }
+})
+
+// Update course with full structure (modules and lessons) - with sync parameter
+router.put("/:courseId", async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId } = req.params
+  const syncMode = req.query.sync === 'ids'
+  const parsed = fullCourseSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
+  
+  const data = parsed.data
+  
+  try {
+    if (syncMode) {
+      // Sync mode - update existing structure with IDs
+      const course = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+          modules: {
+            include: {
+              lessons: true,
+            },
+          },
+        },
+      })
+      
+      if (!course) return res.status(404).json({ error: "Course not found" })
+      
+      // Update course basic info
+      await prisma.course.update({
+        where: { id: courseId },
+        data: {
+          title: data.title,
+          description: data.description,
+          difficulty: data.difficulty,
+          price: data.price,
+          isFree: data.isFree,
+          isPublished: data.isPublished,
+          totalModules: data.modules.length,
+        },
+      })
+      
+      // Process modules and lessons
+      for (const moduleData of data.modules) {
+        if (moduleData.id) {
+          // Update existing module
+          await prisma.courseModule.update({
+            where: { id: moduleData.id },
+            data: {
+              title: moduleData.title,
+              orderIndex: moduleData.orderIndex,
+            },
+          })
+          
+          // Process lessons
+          for (const lessonData of moduleData.lessons) {
+            if (lessonData.id) {
+              // Update existing lesson
+              await prisma.lesson.update({
+                where: { id: lessonData.id },
+                data: {
+                  title: lessonData.title,
+                  content: lessonData.content,
+                  duration: lessonData.duration,
+                  orderIndex: lessonData.orderIndex,
+                  isFreePreview: lessonData.isFreePreview,
+                  videoUrl: lessonData.videoUrl,
+                  presentationUrl: lessonData.presentationUrl,
+                  slides: lessonData.slides || [],
+                  contentType: lessonData.contentType,
+                },
+              })
+            } else {
+              // Create new lesson
+              await prisma.lesson.create({
+                data: {
+                  moduleId: moduleData.id,
+                  title: lessonData.title,
+                  content: lessonData.content,
+                  duration: lessonData.duration,
+                  orderIndex: lessonData.orderIndex,
+                  isFreePreview: lessonData.isFreePreview,
+                  videoUrl: lessonData.videoUrl,
+                  presentationUrl: lessonData.presentationUrl,
+                  slides: lessonData.slides || [],
+                  contentType: lessonData.contentType,
+                },
+              })
+            }
+          }
+        } else {
+          // Create new module with lessons
+          await prisma.courseModule.create({
+            data: {
+              courseId,
+              title: moduleData.title,
+              orderIndex: moduleData.orderIndex,
+              lessons: {
+                create: moduleData.lessons.map((lesson) => ({
+                  title: lesson.title,
+                  content: lesson.content,
+                  duration: lesson.duration,
+                  orderIndex: lesson.orderIndex,
+                  isFreePreview: lesson.isFreePreview,
+                  videoUrl: lesson.videoUrl,
+                  presentationUrl: lesson.presentationUrl,
+                  slides: lesson.slides || [],
+                  contentType: lesson.contentType,
+                })),
+              },
+            },
+          })
+        }
+      }
+      
+      // Return updated course
+      const updatedCourse = await prisma.course.findUnique({
+        where: { id: courseId },
+        include: {
+          modules: {
+            include: {
+              lessons: true,
+            },
+          },
+        },
+      })
+      
+      return res.json(updatedCourse)
+    } else {
+      // Regular update - just basic course info
+      const course = await prisma.course.update({
+        where: { id: courseId },
+        data: {
+          title: data.title,
+          description: data.description,
+          difficulty: data.difficulty,
+          price: data.price,
+          isFree: data.isFree,
+          isPublished: data.isPublished,
+          totalModules: data.modules.length,
+        },
+      })
+      
+      return res.json(course)
+    }
+  } catch (error) {
+    console.error("Error updating course:", error)
+    return res.status(500).json({ error: "Failed to update course" })
+  }
+})
+
 // Create or update course basic info
 router.post("/courses/:courseId/basic", async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params

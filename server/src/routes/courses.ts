@@ -20,7 +20,141 @@ import type { AuthenticatedRequest } from "../types"
 import { generateCertificate, saveCertificate } from '../utils/certificate'
 import { sendCertificateEmail } from '../utils/email'
 
+function toApiMedia(u?: string | null): string | undefined {
+  try {
+    if (!u) return undefined
+    const s = String(u)
+    if (s.startsWith('/api/media/')) return s
+    if (s.startsWith('/media/')) return s.replace('/media/', '/api/media/')
+    const url = new URL(s)
+    if (url.pathname.startsWith('/api/media/')) return url.pathname
+    if (url.pathname.startsWith('/media/')) return url.pathname.replace('/media/','/api/media/')
+    return s
+  } catch { return u as any }
+}
+
 export const router = Router()
+
+// Get lesson details for regular users
+router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId, lessonId } = req.params
+  
+  try {
+    // Check if user has access to this course
+    if (req.user) {
+      const enrollment = await prisma.enrollment.findUnique({
+        where: {
+          userId_courseId: {
+            userId: req.user.id,
+            courseId: courseId
+          }
+        }
+      })
+      
+      if (!enrollment) {
+        return res.status(403).json({ error: "Not enrolled in this course" })
+      }
+    }
+    
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        module: {
+          select: {
+            id: true,
+            title: true,
+            courseId: true,
+            orderIndex: true
+          }
+        }
+      }
+    })
+    
+    if (!lesson) {
+      return res.status(404).json({ error: "Lesson not found" })
+    }
+    
+    if (lesson.module.courseId !== courseId) {
+      return res.status(400).json({ error: "Lesson does not belong to this course" })
+    }
+    
+    // Get questions for this lesson
+    const questions = await prisma.courseQuestion.findMany({
+      where: { lessonId: lessonId },
+      orderBy: { createdAt: "asc" }
+    })
+    
+    // Transform media URLs
+    const transformedLesson = {
+      ...lesson,
+      videoUrl: toApiMedia(lesson.videoUrl),
+      presentationUrl: toApiMedia(lesson.presentationUrl),
+      slides: lesson.slides?.map((slide: any) => ({
+        ...slide,
+        url: toApiMedia(slide.url)
+      }))
+    }
+    
+    res.json({
+      lesson: transformedLesson,
+      questions: questions
+    })
+  } catch (error) {
+    console.error("Error fetching lesson:", error)
+    res.status(500).json({ error: "Failed to fetch lesson" })
+  }
+})
+
+// Get questions for a specific lesson
+router.get("/:courseId/lessons/:lessonId/questions", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { courseId, lessonId } = req.params
+  
+  try {
+    // Check if user has access to this course
+    if (req.user) {
+      const enrollment = await prisma.enrollment.findUnique({
+        where: {
+          userId_courseId: {
+            userId: req.user.id,
+            courseId: courseId
+          }
+        }
+      })
+      
+      if (!enrollment) {
+        return res.status(403).json({ error: "Not enrolled in this course" })
+      }
+    }
+    
+    // Verify lesson belongs to course
+    const lesson = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        module: {
+          select: { courseId: true }
+        }
+      }
+    })
+    
+    if (!lesson) {
+      return res.status(404).json({ error: "Lesson not found" })
+    }
+    
+    if (lesson.module.courseId !== courseId) {
+      return res.status(400).json({ error: "Lesson does not belong to this course" })
+    }
+    
+    const questions = await prisma.courseQuestion.findMany({
+      where: { lessonId: lessonId },
+      orderBy: { createdAt: "asc" }
+    })
+    
+    res.json(questions)
+  } catch (error) {
+    console.error("Error fetching lesson questions:", error)
+    res.status(500).json({ error: "Failed to fetch lesson questions" })
+  }
+})
 
 const purchaseSchema = z.object({
   amount: z.number().positive(),
