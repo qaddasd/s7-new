@@ -9,11 +9,13 @@ function normalizeMediaUrl(u?: string | null): string | undefined {
   try {
     if (!u) return undefined
     const s = String(u)
-    if (s.startsWith("/api/media/")) return s.replace("/api/media/", "/media/")
-    if (s.startsWith("/media/")) return s
+    // Keep /api/media/ format for consistency with other endpoints
+    if (s.startsWith("/api/media/")) return s
+    if (s.startsWith("/media/")) return s.replace("/media/", "/api/media/")
+    // Handle full URLs
     const url = new URL(s)
-    if (url.pathname.startsWith("/api/media/")) return url.pathname.replace("/api/media/", "/media/")
-    if (url.pathname.startsWith("/media/")) return url.pathname
+    if (url.pathname.startsWith("/api/media/")) return url.pathname
+    if (url.pathname.startsWith("/media/")) return url.pathname.replace("/media/", "/api/media/")
     return s
   } catch {
     return u || undefined
@@ -32,31 +34,47 @@ router.get("/", optionalAuth, async (req: AuthenticatedRequest, res: Response) =
       ...(includeLiked ? { likes: { where: { userId: req.user!.id } } } : {}),
     } as any,
   })
+  
+  console.log('[ByteSize] Feed request - found items:', items.length)
+  if (items.length > 0) {
+    console.log('[ByteSize] Sample item:', {
+      id: items[0].id,
+      title: items[0].title,
+      videoUrl: items[0].videoUrl,
+      createdAt: items[0].createdAt
+    })
+  }
+  
   const tag = (req.query.tag as string | undefined)?.trim()
   const filtered = tag && tag.toLowerCase() !== "all"
     ? items.filter((it: any) => Array.isArray(it.tags) && it.tags.some((t: string) => String(t).toLowerCase() === tag.toLowerCase()))
     : items
-  res.json(
-    filtered.map((it: any) => {
-      const rawTags = Array.isArray(it.tags) ? it.tags : []
-      const linkTag = rawTags.find((t: any) => typeof t === "string" && t.startsWith("__course:"))
-      const linkedCourseId = (it as any).linkedCourseId || (typeof linkTag === "string" ? linkTag.slice("__course:".length) : undefined)
-      const publicTags = rawTags.filter((t: any) => !(typeof t === "string" && t.startsWith("__course:")))
-      return {
-        id: it.id,
-        title: it.title,
-        description: it.description,
-        videoUrl: normalizeMediaUrl(it.videoUrl) || it.videoUrl,
-        coverImageUrl: normalizeMediaUrl(it.coverImageUrl) || it.coverImageUrl,
-        tags: publicTags,
-        linkedCourseId,
-        createdAt: it.createdAt,
-        views: (it as any).views ?? viewCounters.get(it.id) ?? 0,
-        likesCount: it._count?.likes ?? 0,
-        likedByMe: Array.isArray(it.likes) ? it.likes.length > 0 : false,
-      }
-    })
-  )
+  
+  const result = filtered.map((it: any) => {
+    const rawTags = Array.isArray(it.tags) ? it.tags : []
+    const linkTag = rawTags.find((t: any) => typeof t === "string" && t.startsWith("__course:"))
+    const linkedCourseId = (it as any).linkedCourseId || (typeof linkTag === "string" ? linkTag.slice("__course:".length) : undefined)
+    const publicTags = rawTags.filter((t: any) => !(typeof t === "string" && t.startsWith("__course:")))
+    const normalizedVideoUrl = normalizeMediaUrl(it.videoUrl) || it.videoUrl
+    const normalizedCoverUrl = normalizeMediaUrl(it.coverImageUrl) || it.coverImageUrl
+    
+    return {
+      id: it.id,
+      title: it.title,
+      description: it.description,
+      videoUrl: normalizedVideoUrl,
+      coverImageUrl: normalizedCoverUrl,
+      tags: publicTags,
+      linkedCourseId,
+      createdAt: it.createdAt,
+      views: (it as any).views ?? viewCounters.get(it.id) ?? 0,
+      likesCount: it._count?.likes ?? 0,
+      likedByMe: Array.isArray(it.likes) ? it.likes.length > 0 : false,
+    }
+  })
+  
+  console.log('[ByteSize] Returning items:', result.length)
+  res.json(result)
 })
 
 router.post("/:id/like", requireAuth, async (req: AuthenticatedRequest, res: Response) => {

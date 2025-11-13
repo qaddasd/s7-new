@@ -90,16 +90,31 @@ router.post("/bytesize", async (req: AuthenticatedRequest, res: Response) => {
   const parsed = byteSizeSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() })
   const data = parsed.data
+  
+  // Normalize URLs to /api/media/ format
+  const normalizedVideoUrl = normalizeMediaUrl(data.videoUrl) || data.videoUrl
+  const normalizedCoverUrl = normalizeMediaUrl(data.coverImageUrl) || data.coverImageUrl
+  
+  console.log('[ByteSize] Creating new item:', {
+    title: data.title,
+    videoUrl: data.videoUrl,
+    normalizedVideoUrl,
+    coverImageUrl: data.coverImageUrl,
+    normalizedCoverUrl
+  })
+  
   const created = await (prisma as any).byteSizeItem.create({
     data: {
       title: data.title,
       description: data.description,
-      videoUrl: normalizeMediaUrl(data.videoUrl) || data.videoUrl,
-      coverImageUrl: normalizeMediaUrl(data.coverImageUrl) || data.coverImageUrl,
+      videoUrl: normalizedVideoUrl,
+      coverImageUrl: normalizedCoverUrl,
       tags: data.tags && data.tags.length ? data.tags : undefined,
       authorId: req.user!.id,
     },
   })
+  
+  console.log('[ByteSize] Created item:', { id: created.id, videoUrl: created.videoUrl })
   res.status(201).json(created)
 })
 

@@ -242,6 +242,17 @@ export default function Page() {
   const onSelectVideo = async (file: File) => {
     const meta = await saveFile("video", file)
     updateLesson({ videoName: file.name, videoMediaId: meta.id })
+    
+    // Automatically upload to server in the background
+    toast({ title: "Загрузка видео...", description: "Видео загружается на сервер" } as any)
+    try {
+      const url = await uploadById(meta.id)
+      updateLesson({ videoUrl: url })
+      toast({ title: "Видео загружено", description: "Видео успешно загружено на сервер" } as any)
+    } catch (e: any) {
+      console.warn("Auto-upload failed:", e?.message)
+      toast({ title: "Ошибка автозагрузки", description: "Используйте кнопку 'Загрузить на сервер'", variant: "destructive" as any })
+    }
   }
 
   const onAddSlide = async (file: File) => {
@@ -249,11 +260,29 @@ export default function Page() {
     const s = [...(lesson?.slides || []), file.name]
     const ids = [...(lesson?.slideMediaIds || []), meta.id]
     updateLesson({ slides: s, slideMediaIds: ids })
+    
+    // Automatically upload to server in the background
+    try {
+      const url = await uploadById(meta.id)
+      const currentUrls = lesson?.slideUrls || []
+      updateLesson({ slideUrls: [...currentUrls, url] })
+    } catch (e: any) {
+      console.warn("Auto-upload failed:", e?.message)
+    }
   }
 
   const onSelectPresentation = async (file: File) => {
     const meta = await saveFile("presentation", file)
     updateLesson({ presentationFileName: file.name, presentationMediaId: meta.id })
+    
+    // Automatically upload to server in the background
+    try {
+      const url = await uploadById(meta.id)
+      updateLesson({ presentationUrl: url })
+      toast({ title: "Презентация загружена" } as any)
+    } catch (e: any) {
+      console.warn("Auto-upload failed:", e?.message)
+    }
   }
 
   const removeSlideAt = async (idx: number) => {

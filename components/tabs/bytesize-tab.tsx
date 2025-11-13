@@ -61,9 +61,24 @@ export default function ByteSizeTab() {
   }
 
   useEffect(() => {
+    console.log('[ByteSize Tab] Fetching bytesize items...')
     apiFetch<ReelItem[]>("/bytesize")
-      .then((list) => setItems(list || []))
-      .catch(() => setItems([]))
+      .then((list) => {
+        console.log('[ByteSize Tab] Received items:', list?.length || 0)
+        if (list && list.length > 0) {
+          console.log('[ByteSize Tab] Sample item:', {
+            id: list[0].id,
+            title: list[0].title,
+            videoUrl: list[0].videoUrl,
+            coverImageUrl: list[0].coverImageUrl
+          })
+        }
+        setItems(list || [])
+      })
+      .catch((err) => {
+        console.error('[ByteSize Tab] Error fetching items:', err)
+        setItems([])
+      })
       .finally(() => setLoading(false))
   }, [])
 

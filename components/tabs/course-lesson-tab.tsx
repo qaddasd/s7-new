@@ -215,7 +215,14 @@ export default function CourseLessonTab({
 
   const answerLessonQuestion = async (questionId: string, selectedIndex: number) => {
     try {
-      const res = await apiFetch<{ isCorrect: boolean; correctIndex: number; error?: string }>(`/courses/questions/${questionId}/answer`, {
+      const res = await apiFetch<{ 
+        isCorrect: boolean; 
+        correctIndex: number; 
+        xpAwarded: number;
+        userTotalXp: number;
+        achievements?: Array<{ type: string; threshold: number; message: string; certificateSent: boolean }>;
+        error?: string 
+      }>(`/courses/questions/${questionId}/answer`, {
         method: "POST",
         body: JSON.stringify({ selectedIndex })
       })
@@ -228,15 +235,15 @@ export default function CourseLessonTab({
       setLessonQuiz((prev) => prev.map((q) => (q.id === questionId ? { ...q, selectedIndex, isCorrect: res.isCorrect, correctIndex: res.correctIndex } : q)))
       toast({ title: res.isCorrect ? 'Верно' : 'Неверно', description: res.isCorrect ? 'Отличная работа!' : 'Правильный вариант подсвечен' })
 
-      if (res.isCorrect) {
-        try {
-          const prevXp = typeof (user as any)?.xp === 'number' ? (user as any).xp : (typeof (user as any)?.experiencePoints === 'number' ? (user as any).experiencePoints : 0)
-          const profile = await apiFetch<{ xp?: number }>(`/auth/me`)
-          const newXp = typeof profile?.xp === 'number' ? profile.xp : prevXp
-          if (prevXp < 100 && newXp >= 100) {
-            toast({ title: 'Поздравляем!', description: 'Вы успешно достигли 100 очков в этом курсе. На вашу почту отправлен бонус.' })
-          }
-        } catch {}
+      // Display achievement notifications from backend response
+      if (res.achievements && res.achievements.length > 0) {
+        for (const achievement of res.achievements) {
+          toast({ 
+            title: 'Поздравляем! 🎉', 
+            description: achievement.message,
+            duration: 6000
+          })
+        }
       }
     } catch (e: any) {
       toast({ title: 'Ошибка', description: e?.message || 'Не удалось отправить ответ', variant: 'destructive' as any })

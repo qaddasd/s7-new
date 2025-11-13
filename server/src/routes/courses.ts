@@ -219,13 +219,17 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
     data: { questionId, userId: req.user!.id, selectedIndex, isCorrect },
   })
   let awarded = 0
+  const achievements: Array<{ type: string; threshold: number; message: string; certificateSent: boolean }> = []
+  
   if (isCorrect) {
     // Unified reward for correct answer
     const reward = 20
     awarded = reward
     const before = (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints || 0
     await prisma.user.update({ where: { id: req.user!.id }, data: { experiencePoints: { increment: awarded } } })
-    const crossed = Number(before) < 100 && Number(before) + Number(awarded) >= 100
+    const afterXp = Number(before) + Number(awarded)
+    const crossed = Number(before) < 100 && afterXp >= 100
+    
     if (crossed) {
       const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } })
       for (const a of admins) {
@@ -233,6 +237,7 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
       }
       
       // Generate and send certificate
+      let certificateSent = false
       try {
         const user = await prisma.user.findUnique({ 
           where: { id: req.user!.id }, 
@@ -257,18 +262,36 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
           
           // Send certificate email
           await sendCertificateEmail(user.email, fullName, courseName, certificateBuffer)
+          certificateSent = true
         }
       } catch (error) {
         console.error('Error generating/sending certificate:', error)
         // Don't fail the answer submission if certificate generation fails
       }
+      
+      // Add achievement notification data for frontend
+      achievements.push({
+        type: 'milestone',
+        threshold: 100,
+        message: 'Поздравляем! Вы успешно достигли 100 очков в этом курсе. На вашу почту отправлен бонус.',
+        certificateSent
+      })
     }
+    
     // increment daily missions progress for this course (type: correct_answers)
     try {
       await incrementDailyMissionsProgressForCourse({ courseId: q.courseId, userId: req.user!.id, delta: 1 })
     } catch {}
   }
-  res.status(201).json({ isCorrect, answerId: ans.id, correctIndex: q.correctIndex, xpAwarded: awarded })
+  
+  res.status(201).json({ 
+    isCorrect, 
+    answerId: ans.id, 
+    correctIndex: q.correctIndex, 
+    xpAwarded: awarded,
+    userTotalXp: (await prisma.user.findUnique({ where: { id: req.user!.id }, select: { experiencePoints: true } }))?.experiencePoints || 0,
+    achievements 
+  })
 })
 
 // Daily missions
