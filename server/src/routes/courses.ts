@@ -84,6 +84,8 @@ router.post("/:courseId/questions", requireAuth, async (req: AuthenticatedReques
 
 router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId } = req.params
+  console.log('🔍 GET /courses/:courseId/questions', { courseId, query: req.query })
+  
   const course = await prisma.course.findUnique({ where: { id: courseId }, select: { id: true, isFree: true, price: true } })
   if (!course) return res.status(404).json({ error: "Course not found" })
 
@@ -113,7 +115,10 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
   if (lessonId) where.lessonId = lessonId
   if (level) where.level = Number(level)
   if (levelMin || levelMax) where.level = { gte: levelMin ? Number(levelMin) : undefined, lte: levelMax ? Number(levelMax) : undefined }
+  
+  console.log('🔍 Querying questions with where:', where)
   const list = await (prisma as any).courseQuestion.findMany({ where, orderBy: { createdAt: "desc" } })
+  console.log('📝 Questions found:', list.length, list.map((q: any) => ({ id: q.id, text: q.text, lessonId: q.lessonId })))
   
   // Include user answer status if user is authenticated
   let result = list.map((q: any) => ({ id: q.id, text: q.text, options: q.options, moduleId: q.moduleId, lessonId: q.lessonId, xpReward: q.xpReward, level: q.level }))
@@ -137,6 +142,7 @@ router.get("/:courseId/questions", optionalAuth, async (req: AuthenticatedReques
     })
   }
   
+  console.log('✅ Sending questions response:', result.length, 'questions')
   res.json(result)
 })
 
@@ -520,7 +526,17 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
 
 router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, lessonId } = req.params
+  console.log('🔍 GET /courses/:courseId/lessons/:lessonId', { courseId, lessonId })
+  
   const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
+  console.log('📚 Lesson from DB:', { 
+    id: lesson?.id, 
+    title: lesson?.title, 
+    videoUrl: lesson?.videoUrl,
+    content: lesson?.content?.substring(0, 100),
+    slides: lesson?.slides
+  })
+  
   if (!lesson || lesson.module.courseId !== courseId) return res.status(404).json({ error: "Lesson not found" })
 
   const isAdmin = (req.user as any)?.role === "ADMIN"
@@ -540,7 +556,7 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: Authenticat
   const hasAccess = isAdmin ? true : await userHasCourseAccess(req.user?.id, lesson.module.course)
   if (!hasAccess && !lesson.isFreePreview) return res.status(403).json({ error: "Lesson requires purchase" })
 
-  res.json({
+  const response = {
     id: lesson.id,
     title: lesson.title,
     content: lesson.content,
@@ -552,7 +568,16 @@ router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: Authenticat
       : lesson.slides,
     isFreePreview: lesson.isFreePreview,
     moduleId: lesson.moduleId,
+  }
+  
+  console.log('✅ Sending lesson response:', { 
+    id: response.id, 
+    videoUrl: response.videoUrl,
+    hasContent: !!response.content,
+    slidesCount: Array.isArray(response.slides) ? response.slides.length : 0
   })
+  
+  res.json(response)
 })
 
 router.post("/:courseId/purchase", requireAuth, async (req: AuthenticatedRequest, res: Response) => {

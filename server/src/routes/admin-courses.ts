@@ -266,6 +266,16 @@ router.put("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Response
   
   const data = parsed.data
   
+  console.log('💾 Updating lesson:', lessonId, {
+    title: data.title,
+    hasContent: !!data.content,
+    hasVideoUrl: !!data.videoUrl,
+    videoUrl: data.videoUrl,
+    hasPresentationUrl: !!data.presentationUrl,
+    slidesCount: Array.isArray(data.slides) ? data.slides.length : 0,
+    hasQuizData: !!(data.quizQuestion && data.quizOptions)
+  })
+  
   try {
     const lesson = await prisma.lesson.update({
       where: { id: lessonId },
@@ -276,34 +286,45 @@ router.put("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Response
         isFreePreview: data.isFreePreview,
         videoUrl: data.videoUrl,
         presentationUrl: data.presentationUrl,
-        slides: data.slides,
+        slides: data.slides as any,
         contentType: data.contentType,
       },
     })
     
+    console.log('✅ Lesson updated in DB:', { id: lesson.id, videoUrl: lesson.videoUrl, hasContent: !!lesson.content })
+    
     // Update quiz question if provided
     if (data.quizQuestion || data.quizOptions || data.quizCorrectIndex !== undefined) {
+      console.log('📝 Processing quiz question:', {
+        hasQuestion: !!data.quizQuestion,
+        hasOptions: !!data.quizOptions,
+        optionsCount: data.quizOptions?.length,
+        correctIndex: data.quizCorrectIndex
+      })
+      
       const existingQuestion = await prisma.courseQuestion.findFirst({
         where: { lessonId },
       })
       
       if (existingQuestion) {
         // Update existing question
+        console.log('✏️ Updating existing question:', existingQuestion.id)
         await prisma.courseQuestion.update({
           where: { id: existingQuestion.id },
           data: {
             text: data.quizQuestion || existingQuestion.text,
-            options: data.quizOptions || existingQuestion.options,
+            options: (data.quizOptions || existingQuestion.options) as any,
             correctIndex: data.quizCorrectIndex !== undefined ? data.quizCorrectIndex : existingQuestion.correctIndex,
             xpReward: data.quizXp || existingQuestion.xpReward,
           },
         })
-      } else if (data.quizQuestion && data.quizOptions && data.quizOptions.length >= 2 && data.quizCorrectIndex >= 0) {
+      } else if (data.quizQuestion && data.quizOptions && data.quizOptions.length >= 2 && data.quizCorrectIndex !== undefined && data.quizCorrectIndex >= 0) {
         // Create new question
         const module = await prisma.courseModule.findUnique({
           where: { id: lesson.moduleId },
         })
         
+        console.log('➕ Creating new question for lesson:', lessonId)
         await prisma.courseQuestion.create({
           data: {
             courseId: module!.courseId,
@@ -316,6 +337,13 @@ router.put("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Response
             level: 1,
             authorId: req.user!.id,
           },
+        })
+        console.log('✅ Question created successfully')
+      } else {
+        console.log('⚠️ Question not created - validation failed:', {
+          hasQuestion: !!data.quizQuestion,
+          hasOptions: data.quizOptions && data.quizOptions.length >= 2,
+          hasCorrectIndex: data.quizCorrectIndex !== undefined && data.quizCorrectIndex >= 0
         })
       }
     }
