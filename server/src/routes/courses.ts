@@ -520,7 +520,7 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
 
 router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, lessonId } = req.params
-  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
+  const lesson = await prisma.courseLesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
   if (!lesson || lesson.module.courseId !== courseId) return res.status(404).json({ error: "Lesson not found" })
 
   const isAdmin = (req.user as any)?.role === "ADMIN"
