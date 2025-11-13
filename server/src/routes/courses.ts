@@ -20,19 +20,6 @@ import type { AuthenticatedRequest } from "../types"
 import { generateCertificate, saveCertificate } from '../utils/certificate'
 import { sendCertificateEmail } from '../utils/email'
 
-function toApiMedia(u?: string | null): string | undefined {
-  try {
-    if (!u) return undefined
-    const s = String(u)
-    if (s.startsWith('/api/media/')) return s
-    if (s.startsWith('/media/')) return s.replace('/media/', '/api/media/')
-    const url = new URL(s)
-    if (url.pathname.startsWith('/api/media/')) return url.pathname
-    if (url.pathname.startsWith('/media/')) return url.pathname.replace('/media/','/api/media/')
-    return s
-  } catch { return u as any }
-}
-
 export const router = Router()
 
 // Get lesson details for regular users
