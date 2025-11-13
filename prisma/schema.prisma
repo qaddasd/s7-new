@@ -463,8 +463,6 @@ model ClubSession {
   status         String     @default("scheduled")
   createdAt      DateTime   @default(now())
 
-  attendances    Attendance[]
-
   // Quiz snapshot for the session
   quiz           ClubSessionQuiz?
   // Quiz submissions for this session
@@ -846,6 +844,11 @@ model ClubClass {
   updatedAt   DateTime @updatedAt
 
   schedules   Schedule[]
+  scheduleItems ScheduleItem[]
+  enrollments   ClassEnrollment[]
+  sessions      ClubSession[]
+  resources     ClubResource[]
+  assignments   ClubAssignment[]
 
   @@unique([kruzhokId, orderIndex])
   @@index([kruzhokId, isActive])
