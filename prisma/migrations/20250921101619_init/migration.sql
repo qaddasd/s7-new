@@ -11,8 +11,8 @@ CREATE TABLE "users" (
     "experience_points" INTEGER NOT NULL DEFAULT 0,
     "is_admin" BOOLEAN NOT NULL DEFAULT false,
     "email_verified" BOOLEAN NOT NULL DEFAULT false,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" DATETIME NOT NULL
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL
 );
 
 -- CreateTable
@@ -23,7 +23,7 @@ CREATE TABLE "user_profiles" (
     "bio" TEXT,
     "phone" TEXT,
     "social_links" TEXT,
-    "last_login" DATETIME,
+    "last_login" TIMESTAMP(3),
     CONSTRAINT "user_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -40,8 +40,8 @@ CREATE TABLE "courses" (
     "cover_image_url" TEXT,
     "total_modules" INTEGER NOT NULL DEFAULT 0,
     "estimated_hours" INTEGER,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" DATETIME NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "courses_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -53,7 +53,7 @@ CREATE TABLE "course_modules" (
     "description" TEXT,
     "order_index" INTEGER NOT NULL,
     "is_locked" BOOLEAN NOT NULL DEFAULT false,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "course_modules_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -68,7 +68,7 @@ CREATE TABLE "lessons" (
     "duration" TEXT,
     "order_index" INTEGER NOT NULL,
     "is_free_preview" BOOLEAN NOT NULL DEFAULT false,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "lessons_module_id_fkey" FOREIGN KEY ("module_id") REFERENCES "course_modules" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -77,8 +77,8 @@ CREATE TABLE "user_course_enrollments" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "user_id" TEXT NOT NULL,
     "course_id" TEXT NOT NULL,
-    "enrolled_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completed_at" DATETIME,
+    "enrolled_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completed_at" TIMESTAMP(3),
     "progress_percentage" DECIMAL NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'active',
     CONSTRAINT "user_course_enrollments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -92,8 +92,8 @@ CREATE TABLE "user_lesson_progress" (
     "lesson_id" TEXT NOT NULL,
     "is_completed" BOOLEAN NOT NULL DEFAULT false,
     "watch_time_seconds" INTEGER NOT NULL DEFAULT 0,
-    "started_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "completed_at" DATETIME,
+    "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completed_at" TIMESTAMP(3),
     CONSTRAINT "user_lesson_progress_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "user_lesson_progress_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lessons" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -109,7 +109,7 @@ CREATE TABLE "achievements" (
     "criteria_data" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "points_value" INTEGER NOT NULL DEFAULT 100,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- CreateTable
@@ -117,7 +117,7 @@ CREATE TABLE "user_achievements" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "user_id" TEXT NOT NULL,
     "achievement_id" TEXT NOT NULL,
-    "earned_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "earned_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "awarded_by_id" TEXT,
     "admin_note" TEXT,
     CONSTRAINT "user_achievements_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -134,7 +134,7 @@ CREATE TABLE "teams" (
     "logo_url" TEXT,
     "max_members" INTEGER NOT NULL DEFAULT 6,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "teams_captain_id_fkey" FOREIGN KEY ("captain_id") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -144,7 +144,7 @@ CREATE TABLE "team_memberships" (
     "team_id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
     "role" TEXT NOT NULL DEFAULT 'member',
-    "joined_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "joined_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "status" TEXT NOT NULL DEFAULT 'active',
     CONSTRAINT "team_memberships_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "teams" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "team_memberships_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -156,11 +156,11 @@ CREATE TABLE "competitions" (
     "name" TEXT NOT NULL,
     "description" TEXT,
     "team_id" TEXT NOT NULL,
-    "competition_date" DATETIME NOT NULL,
+    "competition_date" TIMESTAMP(3) NOT NULL,
     "venue" TEXT,
     "awards_won" TEXT,
     "status" TEXT NOT NULL DEFAULT 'upcoming',
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "competitions_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "teams" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -174,8 +174,8 @@ CREATE TABLE "purchases" (
     "payment_method" TEXT NOT NULL DEFAULT 'kaspi',
     "kaspi_transaction_id" TEXT,
     "status" TEXT NOT NULL DEFAULT 'pending',
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "confirmed_at" DATETIME,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "confirmed_at" TIMESTAMP(3),
     "admin_notes" TEXT,
     CONSTRAINT "purchases_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "purchases_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -190,7 +190,7 @@ CREATE TABLE "notifications" (
     "type" TEXT NOT NULL,
     "is_read" BOOLEAN NOT NULL DEFAULT false,
     "metadata" TEXT,
-    "created_at" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
