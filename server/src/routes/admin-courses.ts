@@ -219,7 +219,7 @@ router.post("/modules/:moduleId/lessons", async (req: AuthenticatedRequest, res:
     if (!module) return res.status(404).json({ error: "Module not found" })
     
     // Create lesson
-    const lesson = await prisma.courseLesson.create({
+    const lesson = await prisma.lesson.create({
       data: {
         moduleId,
         title: data.title,
@@ -267,7 +267,7 @@ router.put("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Response
   const data = parsed.data
   
   try {
-    const lesson = await prisma.courseLesson.update({
+    const lesson = await prisma.lesson.update({
       where: { id: lessonId },
       data: {
         title: data.title,
@@ -337,7 +337,7 @@ router.post("/lessons/:lessonId/questions", async (req: AuthenticatedRequest, re
   
   try {
     // Verify lesson exists and get module info
-    const lesson = await prisma.courseLesson.findUnique({
+    const lesson = await prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { module: true },
     })
@@ -411,7 +411,7 @@ router.delete("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Respo
   
   try {
     // Get lesson info first
-    const lesson = await prisma.courseLesson.findUnique({
+    const lesson = await prisma.lesson.findUnique({
       where: { id: lessonId },
       include: { module: true },
     })
@@ -419,7 +419,7 @@ router.delete("/lessons/:lessonId", async (req: AuthenticatedRequest, res: Respo
     if (!lesson) return res.status(404).json({ error: "Lesson not found" })
     
     // Delete lesson (questions will be cascade deleted)
-    await prisma.courseLesson.delete({ where: { id: lessonId } })
+    await prisma.lesson.delete({ where: { id: lessonId } })
     
     return res.json({ success: true })
   } catch (error) {

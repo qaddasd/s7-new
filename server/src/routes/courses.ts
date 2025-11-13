@@ -177,16 +177,16 @@ router.post("/questions/:questionId/answer", requireAuth, async (req: Authentica
       try {
         const user = await prisma.user.findUnique({ 
           where: { id: req.user!.id }, 
-          select: { email: true, firstName: true, lastName: true } 
+          select: { email: true, fullName: true } 
         })
         
-        if (user && user.email && user.firstName && user.lastName) {
+        if (user && user.email && user.fullName) {
           const course = await prisma.course.findUnique({ 
             where: { id: q.courseId }, 
             select: { title: true } 
           })
           
-          const fullName = `${user.firstName} ${user.lastName}`
+          const fullName = user.fullName
           const courseName = course?.title || 'Курс S7 Robotics'
           
           // Generate certificate
@@ -520,7 +520,7 @@ router.get("/:courseId", optionalAuth, async (req: AuthenticatedRequest, res: Re
 
 router.get("/:courseId/lessons/:lessonId", optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { courseId, lessonId } = req.params
-  const lesson = await prisma.courseLesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
+  const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, include: { module: { include: { course: true } } } })
   if (!lesson || lesson.module.courseId !== courseId) return res.status(404).json({ error: "Lesson not found" })
 
   const isAdmin = (req.user as any)?.role === "ADMIN"
