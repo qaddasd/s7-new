@@ -1,17 +1,43 @@
 -- Migration to fix duplicate ClubClass and Attendance models
--- This migration handles existing data by:
--- 1. Renaming old tables to temporary names
--- 2. Creating new tables with enhanced schema
--- 3. Migrating data where possible
--- 4. Dropping old tables
+-- This migration safely handles schema changes by checking for existing objects
 
--- Step 1: Rename old ClubClass table to preserve data
-ALTER TABLE "ClubClass" RENAME TO "ClubClass_old";
+-- Step 1: Drop foreign key constraints that reference old tables
+DO $$ 
+BEGIN
+    -- Drop FK from ClubSession if exists
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ClubSession_classId_fkey') THEN
+        ALTER TABLE "ClubSession" DROP CONSTRAINT "ClubSession_classId_fkey";
+    END IF;
+    
+    -- Drop FK from ClassEnrollment if exists
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ClassEnrollment_classId_fkey') THEN
+        ALTER TABLE "ClassEnrollment" DROP CONSTRAINT "ClassEnrollment_classId_fkey";
+    END IF;
+    
+    -- Drop FK from ScheduleItem if exists
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ScheduleItem_classId_fkey') THEN
+        ALTER TABLE "ScheduleItem" DROP CONSTRAINT "ScheduleItem_classId_fkey";
+    END IF;
+    
+    -- Drop FK from ClubResource if exists
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ClubResource_classId_fkey') THEN
+        ALTER TABLE "ClubResource" DROP CONSTRAINT "ClubResource_classId_fkey";
+    END IF;
+    
+    -- Drop FK from ClubAssignment if exists
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ClubAssignment_classId_fkey') THEN
+        ALTER TABLE "ClubAssignment" DROP CONSTRAINT "ClubAssignment_classId_fkey";
+    END IF;
+END $$;
 
--- Step 2: Rename old Attendance table to preserve data
-ALTER TABLE "Attendance" RENAME TO "Attendance_old";
+-- Step 2: Drop old tables if they exist (will cascade delete related data)
+DROP TABLE IF EXISTS "ClubClass" CASCADE;
+DROP TABLE IF EXISTS "Attendance" CASCADE;
 
--- Step 3: Create new ClubClass table with enhanced schema
+-- Step 3: Drop old enums if they exist
+DROP TYPE IF EXISTS "AttendanceStatus" CASCADE;
+
+-- Step 4: Create new ClubClass table with enhanced schema
 CREATE TABLE "ClubClass" (
     "id" TEXT NOT NULL,
     "kruzhokId" TEXT NOT NULL,
@@ -27,7 +53,7 @@ CREATE TABLE "ClubClass" (
     CONSTRAINT "ClubClass_pkey" PRIMARY KEY ("id")
 );
 
--- Step 4: Create new Attendance table with enhanced schema
+-- Step 5: Create new Attendance table with enhanced schema
 CREATE TABLE "Attendance" (
     "id" TEXT NOT NULL,
     "scheduleId" TEXT NOT NULL,
@@ -40,33 +66,22 @@ CREATE TABLE "Attendance" (
     CONSTRAINT "Attendance_pkey" PRIMARY KEY ("id")
 );
 
--- Step 5: Create indexes and constraints for ClubClass
+-- Step 6: Create new enum
+CREATE TYPE "AttendanceStatusNew" AS ENUM ('PRESENT', 'LATE', 'ABSENT');
+
+-- Step 7: Create indexes for ClubClass
 CREATE UNIQUE INDEX "ClubClass_kruzhokId_orderIndex_key" ON "ClubClass"("kruzhokId", "orderIndex");
 CREATE INDEX "ClubClass_kruzhokId_isActive_idx" ON "ClubClass"("kruzhokId", "isActive");
 
--- Step 6: Create indexes and constraints for Attendance
+-- Step 8: Create indexes for Attendance
 CREATE UNIQUE INDEX "Attendance_scheduleId_studentId_key" ON "Attendance"("scheduleId", "studentId");
 CREATE INDEX "Attendance_studentId_markedAt_idx" ON "Attendance"("studentId", "markedAt");
 
--- Step 7: Add foreign key constraints for ClubClass
+-- Step 9: Add foreign key constraints for ClubClass
 ALTER TABLE "ClubClass" ADD CONSTRAINT "ClubClass_kruzhokId_fkey" FOREIGN KEY ("kruzhokId") REFERENCES "Kruzhok"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "ClubClass" ADD CONSTRAINT "ClubClass_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- Step 8: Add foreign key constraints for Attendance
+-- Step 10: Add foreign key constraints for Attendance
 ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_scheduleId_fkey" FOREIGN KEY ("scheduleId") REFERENCES "Schedule"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_markedById_fkey" FOREIGN KEY ("markedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- Step 9: Drop old tables (data will be lost, but these are test/legacy data)
--- If you need to preserve data, create custom migration scripts
-DROP TABLE IF EXISTS "ClubClass_old" CASCADE;
-DROP TABLE IF EXISTS "Attendance_old" CASCADE;
-
--- Step 10: Drop old enum if it exists and create new one
-DROP TYPE IF EXISTS "AttendanceStatus";
-CREATE TYPE "AttendanceStatusNew" AS ENUM ('PRESENT', 'LATE', 'ABSENT');
-
--- Note: Existing Club and ClubSession records will need manual cleanup
--- Run these after migration if needed:
--- UPDATE "Club" SET "classes" = NULL WHERE "classes" IS NOT NULL;
--- DELETE FROM "ClubSession" WHERE "classId" IN (SELECT id FROM "ClubClass_old");
