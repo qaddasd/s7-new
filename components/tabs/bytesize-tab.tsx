@@ -98,7 +98,7 @@ export default function ByteSizeTab() {
             })
             if (!viewedRef.current.has(id)) {
               viewedRef.current.add(id)
-              fetch(`/bytesize/${id}/view`, { method: 'POST' }).catch(() => {})
+              fetch(`/api/bytesize/${id}/view`, { method: 'POST' }).catch(() => {})
             }
           } else {
             video.pause()
